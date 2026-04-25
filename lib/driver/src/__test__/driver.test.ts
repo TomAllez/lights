@@ -1,31 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { BaseDriver } from '../driver.js';
-import { Subject } from 'rxjs';
 import { Frame, createFrame } from '@lights/io';
 
 class TestDriver extends BaseDriver {
-  private _output$ = new Subject<Frame>();
-  public output$ = this._output$.asObservable();
   public isStarted = false;
 
-  start() {
-    this.isStarted = true;
-  }
-
-  stop() {
-    this.isStarted = false;
-  }
-
-  emit(frame: Frame) {
-    this._output$.next(frame);
-  }
+  start() { this.isStarted = true; }
+  stop() { this.isStarted = false; }
 }
 
 describe('BaseDriver', () => {
   it('should be able to extend BaseDriver and emit frames', () => {
     const driver = new TestDriver();
     const frames: Frame[] = [];
-    driver.output$.subscribe(f => frames.push(f));
+    driver.output.stream$.subscribe(f => frames.push(f));
 
     const mockFrame = createFrame({
       timestamp: Date.now(),
@@ -35,7 +23,7 @@ describe('BaseDriver', () => {
       events: []
     });
 
-    driver.emit(mockFrame);
+    driver.output.emit(mockFrame);
 
     expect(frames.length).toBe(1);
     expect(frames[0]).toBe(mockFrame);

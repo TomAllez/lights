@@ -13,22 +13,23 @@ describe('BaseModule', () => {
   });
 
   it('should pass through frames when no process is attached', () => {
-    const input$ = new Subject<Frame>();
-    const module = new BaseModule(input$, 'test-module');
-    const results: (Frame | undefined)[] = [];
+    const source$ = new Subject<Frame>();
+    const module = new BaseModule('test-module');
+    const results: Frame[] = [];
 
-    module.output$.subscribe(f => results.push(f));
+    module.input.connect(source$.asObservable());
+    module.output.stream$.subscribe(f => results.push(f));
     module.start();
 
-    input$.next(mockFrame);
+    source$.next(mockFrame);
 
     expect(results).toContain(mockFrame);
     module.stop();
   });
 
   it('should apply process function to frames', () => {
-    const input$ = new Subject<Frame>();
-    const module = new BaseModule(input$, 'test-module');
+    const source$ = new Subject<Frame>();
+    const module = new BaseModule('test-module');
     const processedFrame = createFrame({
       timestamp: mockFrame.getTimestamp(),
       duration: 200,
@@ -37,13 +38,14 @@ describe('BaseModule', () => {
       events: []
     });
     const process = vi.fn().mockReturnValue(processedFrame);
-    const results: (Frame | undefined)[] = [];
+    const results: Frame[] = [];
 
+    module.input.connect(source$.asObservable());
     module.attachProcess(process);
-    module.output$.subscribe(f => results.push(f));
+    module.output.stream$.subscribe(f => results.push(f));
     module.start();
 
-    input$.next(mockFrame);
+    source$.next(mockFrame);
 
     expect(process).toHaveBeenCalledWith(mockFrame);
     expect(results).toContain(processedFrame);
@@ -51,19 +53,20 @@ describe('BaseModule', () => {
   });
 
   it('should pass through frames even when stop() is called', () => {
-    const input$ = new Subject<Frame>();
-    const module = new BaseModule(input$, 'test-module');
-    const results: (Frame | undefined)[] = [];
+    const source$ = new Subject<Frame>();
+    const module = new BaseModule('test-module');
+    const results: Frame[] = [];
 
-    module.output$.subscribe(f => results.push(f));
+    module.input.connect(source$.asObservable());
+    module.output.stream$.subscribe(f => results.push(f));
     module.start();
-    input$.next(mockFrame);
-    expect(results.filter(f => f !== undefined).length).toBe(1);
+
+    source$.next(mockFrame);
+    expect(results.length).toBe(1);
 
     module.stop();
-    input$.next(mockFrame);
-    // Should now be 2 because it passes through when stopped
-    expect(results.filter(f => f !== undefined).length).toBe(2);
+    source$.next(mockFrame);
+    expect(results.length).toBe(2);
     expect(results[results.length - 1]).toBe(mockFrame);
   });
 });

@@ -4,4 +4,5 @@
  */
 export { concat } from './concat';
 export * from './frame';
+export { InputPort, OutputPort } from './port';
 
