@@ -1054,6 +1054,23 @@
     tslib "^2.3.0"
     yargs-parser "21.1.1"
 
+"@nx/eslint-plugin@22.7.0":
+  version "22.7.0"
+  resolved "https://registry.yarnpkg.com/@nx/eslint-plugin/-/eslint-plugin-22.7.0.tgz#de1ecea4921aa67c4df862f39bd2ccd0533b2924"
+  integrity sha512-hoWUBtMMTR+/qqi2bQtlUt9UyE9mIEToYDKdKNC5UncKbQse+nbLTuj+13r1ljyhHMKa4h85RtJzSlKC49H/hw==
+  dependencies:
+    "@nx/devkit" "22.7.0"
+    "@nx/js" "22.7.0"
+    "@phenomnomnominal/tsquery" "~6.1.4"
+    "@typescript-eslint/type-utils" "^8.0.0"
+    "@typescript-eslint/utils" "^8.0.0"
+    chalk "^4.1.0"
+    confusing-browser-globals "^1.0.9"
+    globals "^15.9.0"
+    jsonc-eslint-parser "^2.1.0"
+    semver "^7.6.3"
+    tslib "^2.3.0"
+
 "@nx/eslint@^22.7.0":
   version "22.7.0"
   resolved "https://registry.yarnpkg.com/@nx/eslint/-/eslint-22.7.0.tgz#e23002d224901f8c7f30b9b1a05b570980948a7d"

@@ -18,6 +18,9 @@
     },
     {
       "path": "./packages/ts/driver-ffmpeg"
+    },
+    {
+      "path": "./lib/renderer"
     }
   ]
 }
