@@ -21,6 +21,9 @@
     },
     {
       "path": "./lib/renderer"
+    },
+    {
+      "path": "./packages/ts/renderer-websocket"
     }
   ]
 }

@@ -1,1 +1,1 @@
-export * from './driver-ffmpeg.js';
+export * from './driver-ffmpeg';

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lights — WebSocket Renderer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #111;
+      color: #eee;
+      font-family: monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 12px;
+    }
+    canvas { display: block; border: 1px solid #333; }
+    #status { font-size: 13px; color: #888; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="status">Connecting…</div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+
+    let width = 0;
+    let height = 0;
+    let frames = 0;
+    let fpsTimer = Date.now();
+    let fps = 0;
+
+    const ws = new WebSocket(`ws://${location.host}`);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen  = () => { status.textContent = 'Connected — waiting for config…'; };
+    ws.onclose = () => { status.textContent = 'Disconnected'; };
+    ws.onerror = () => { status.textContent = 'Connection error'; };
+
+    ws.onmessage = (event) => {
+      // JSON config message
+      if (typeof event.data === 'string') {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'config') {
+          width = msg.width;
+          height = msg.height;
+          canvas.width = width;
+          canvas.height = height;
+          status.textContent = `${width}×${height} — waiting for frames…`;
+        }
+        return;
+      }
+
+      // Binary frame: raw RGB24 pixel data
+      if (!width || !height) return;
+      const rgb = new Uint8Array(event.data);
+      const rgba = new Uint8ClampedArray(width * height * 4);
+
+      for (let i = 0; i < width * height; i++) {
+        rgba[i * 4]     = rgb[i * 3];     // R
+        rgba[i * 4 + 1] = rgb[i * 3 + 1]; // G
+        rgba[i * 4 + 2] = rgb[i * 3 + 2]; // B
+        rgba[i * 4 + 3] = 255;             // A
+      }
+
+      ctx.putImageData(new ImageData(rgba, width, height), 0, 0);
+
+      frames++;
+      const now = Date.now();
+      if (now - fpsTimer >= 1000) {
+        fps = Math.round(frames * 1000 / (now - fpsTimer));
+        frames = 0;
+        fpsTimer = now;
+        status.textContent = `${width}×${height} — ${fps} fps`;
+      }
+    };
+  </script>
+</body>
+</html>
