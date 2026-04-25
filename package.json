@@ -3,11 +3,16 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "lint": "yarn nx run-many -t lint",
     "test": "yarn nx run-many -t test"
   },
   "private": true,
-  "dependencies": {},
+  "dependencies": {
+    "rxjs": "^7.8.2"
+  },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@nx/eslint": "^22.7.0",
     "@nx/js": "22.7.0",
     "@nx/vite": "22.7.0",
     "@swc-node/register": "1.11.1",
@@ -15,10 +20,12 @@
     "@swc/helpers": "0.5.18",
     "@types/node": "20.19.9",
     "@vitest/coverage-v8": "^4.1.5",
+    "eslint": "^10.2.1",
     "nx": "22.7.0",
     "prettier": "^3.8.1",
     "tslib": "^2.3.0",
     "typescript": "~5.9.2",
+    "typescript-eslint": "^8.19.0",
     "vite": "^8.0.10",
     "vitest": "^4.1.5"
   },
