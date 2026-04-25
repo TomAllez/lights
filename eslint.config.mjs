@@ -11,6 +11,8 @@ export default ts.config(
           allowDefaultProject: [
             'lib/*/vitest.config.ts',
             'lib/*/eslint.config.mjs',
+            'packages/ts/*/vitest.config.ts',
+            'packages/ts/*/eslint.config.mjs',
             'vitest.workspace.ts',
           ],
         },
@@ -25,5 +27,5 @@ export default ts.config(
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     rules: {},
-  }
+  },
 );
