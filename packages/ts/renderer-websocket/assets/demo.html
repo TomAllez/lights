@@ -35,7 +35,7 @@
     let fpsTimer = Date.now();
     let fps = 0;
 
-    const ws = new WebSocket(`ws://${location.host}`);
+    const ws = new WebSocket(`ws://localhost:3000`);
     ws.binaryType = 'arraybuffer';
 
     ws.onopen  = () => { status.textContent = 'Connected — waiting for config…'; };

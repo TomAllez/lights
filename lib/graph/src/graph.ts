@@ -1,15 +1,16 @@
 import { InputPort, OutputPort } from '@lights/io';
 import { BaseDriver } from '@lights/driver';
 import { BaseModule } from '@lights/module';
+import { BaseRenderer } from '@lights/renderer';
 
 /**
- * Directed acyclic graph of drivers and modules.
+ * Directed acyclic graph of drivers, modules and renderers.
  * Nodes are registered by ID; edges are declared as "nodeId:portName" string pairs.
  * Wiring and startup happen lazily on start().
  */
 export class Graph {
   private drivers = new Map<NodeId, BaseDriver>();
-  private modules = new Map<NodeId, BaseModule>();
+  private modules = new Map<NodeId, BaseModule | BaseRenderer>();
   private edges: Array<{ from: string; to: string }> = [];
 
   /**
@@ -31,6 +32,17 @@ export class Graph {
   addModule(id: NodeId, module: BaseModule): this {
     if (this.hasNode(id)) throw new Error(`Node "${id}" already exists`);
     this.modules.set(id, module);
+    return this;
+  }
+
+  /**
+   * Registers a renderer node.
+   * @param {string} id - Unique node identifier
+   * @param {BaseRenderer} renderer - The renderer instance
+   */
+  addRenderer(id: NodeId, renderer: BaseRenderer): this {
+    if (this.hasNode(id)) throw new Error(`Node "${id}" already exists`);
+    this.modules.set(id, renderer);
     return this;
   }
 
@@ -101,7 +113,7 @@ function parsePortRef(ref: string): { nodeId: NodeId; portName: string } {
 }
 
 function resolveOutputPort(
-  node: BaseDriver | BaseModule,
+  node: BaseDriver | BaseModule | BaseRenderer,
   portName: string,
 ): OutputPort {
   const port = (node as unknown as Record<string, unknown>)[portName];
@@ -110,7 +122,10 @@ function resolveOutputPort(
   return port;
 }
 
-function resolveInputPort(node: BaseModule, portName: string): InputPort {
+function resolveInputPort(
+  node: BaseModule | BaseRenderer,
+  portName: string,
+): InputPort {
   const port = (node as unknown as Record<string, unknown>)[portName];
   if (!(port instanceof InputPort))
     throw new Error(`Port "${portName}" is not an InputPort`);

@@ -45,7 +45,7 @@ export class WebSocketRenderer extends BaseRenderer {
    * Starts the HTTP server, WebSocket server, and frame processing.
    */
   override start(): void {
-    const html = readFileSync(new URL('./demo.html', import.meta.url));
+    const html = readFileSync(new URL('../assets/demo.html', import.meta.url));
 
     this.httpServer = createServer((_req: IncomingMessage, res: ServerResponse) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
