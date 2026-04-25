@@ -12,7 +12,9 @@
     {
       "path": "./lib/module"
     },
+    {},
     {
+      "path": "./lib/driver"
     }
   ]
 }

@@ -8,7 +8,11 @@ export default ts.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['lib/module/vitest.config.ts', 'lib/io/vitest.config.ts'],
+          allowDefaultProject: [
+            'lib/*/vitest.config.ts',
+            'lib/*/eslint.config.mjs',
+            'vitest.workspace.ts',
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },
