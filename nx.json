@@ -7,6 +7,12 @@
   },
   "plugins": [
     {
+      "plugin": "@nx/vite/plugin",
+      "options": {
+        "testTargetName": "test"
+      }
+    },
+    {
       "plugin": "@nx/js/typescript",
       "options": {
         "typecheck": {
@@ -20,5 +26,6 @@
         }
       }
     }
-  ]
+  ],
+  "analytics": true
 }
