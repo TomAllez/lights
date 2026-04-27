@@ -11,6 +11,8 @@ const DEFAULT_PACKAGES_PATH = path.resolve(__dirname, '../../../py');
 export type PythonModuleOptions = {
   python?: string;
   packagesPath?: string;
+  /** Extra CLI arguments forwarded to the python script (e.g. ['--width', '640', '--height', '480']) */
+  scriptArgs?: string[];
 };
 
 export class PythonModule extends BaseModule {
@@ -20,12 +22,14 @@ export class PythonModule extends BaseModule {
 
   private readonly python: string;
   private readonly scriptPath: string;
+  private readonly scriptArgs: string[];
 
   constructor(moduleType: AvailableModule, options: PythonModuleOptions = {}) {
     super(`python-${moduleType}`);
     this.python = options.python ?? 'python3';
     const packagesPath = options.packagesPath ?? DEFAULT_PACKAGES_PATH;
     this.scriptPath = path.join(packagesPath, moduleType, 'main.py');
+    this.scriptArgs = options.scriptArgs ?? [];
   }
 
   override start(): void {
@@ -43,7 +47,7 @@ export class PythonModule extends BaseModule {
   }
 
   private spawnPython(): void {
-    this.pythonProcess = spawn(this.python, [this.scriptPath], {
+    this.pythonProcess = spawn(this.python, [this.scriptPath, ...this.scriptArgs], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 

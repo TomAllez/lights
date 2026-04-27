@@ -88,9 +88,18 @@ export class WebSocketRenderer extends BaseRenderer {
     const data = frame.getPart(this.partName);
     if (!data) return;
 
+    const events = frame.getEvents();
+    const eventsMsg = events.length > 0
+      ? JSON.stringify({
+          type: 'events',
+          events: events.map(e => ({ type: e.type, data: Array.from(e.data) })),
+        })
+      : null;
+
     for (const client of this.clients) {
       if (client.readyState === WebSocket.OPEN) {
         client.send(data);
+        if (eventsMsg) client.send(eventsMsg);
       }
     }
   }

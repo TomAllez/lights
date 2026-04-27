@@ -24,6 +24,9 @@
     },
     {
       "path": "./packages/ts/renderer-websocket"
+    },
+    {
+      "path": "./packages/ts/python-module"
     }
   ]
 }

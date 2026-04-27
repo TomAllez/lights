@@ -22,6 +22,7 @@
   "dependencies": {
     "@lights/graph": "*",
     "@lights/driver-ffmpeg": "*",
-    "@lights/renderer-websocket": "*"
+    "@lights/renderer-websocket": "*",
+    "@lights/python-module": "*"
   }
 }
