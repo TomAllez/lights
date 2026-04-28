@@ -4,6 +4,15 @@ import { BaseDriver } from '@lights/driver';
 import { AsyncModule, BaseModule } from '@lights/module';
 import { BaseRenderer } from '@lights/renderer';
 
+/**
+ * Snapshot of throughput and latency metrics for a single graph node.
+ * @property {string} nodeId - Identifier of the node
+ * @property {number} inputFps - Frames received per second
+ * @property {number} outputFps - Frames emitted per second
+ * @property {number} latencyP50 - Median processing latency in milliseconds
+ * @property {number} latencyP95 - 95th-percentile processing latency in milliseconds
+ * @property {number} [drift] - Average frame age at receipt in milliseconds (renderers only)
+ */
 export interface NodeStats {
   nodeId: string;
   inputFps: number;
@@ -13,6 +22,10 @@ export interface NodeStats {
   drift?: number;
 }
 
+/**
+ * Construction options for {@link Graph}.
+ * @property {boolean} [stats] - Enable per-node throughput and latency collection
+ */
 interface GraphOptions {
   stats?: boolean;
 }
@@ -144,6 +157,10 @@ export class Graph {
     }
   }
 
+  /**
+   * Returns a stats snapshot for every node that has been collecting metrics.
+   * @returns {NodeStats[]} Array of per-node stat snapshots
+   */
   getStats(): NodeStats[] {
     return Array.from(this.collectors.entries()).map(([id, c]) => c.snapshot(id));
   }
@@ -153,10 +170,21 @@ export class Graph {
   }
 }
 
+/** Unique string identifier for a graph node. */
 type NodeId = string;
 
+/**
+ * Frame scheduling strategy applied to an edge.
+ * - `'queue'` — default; all frames are forwarded in order
+ * - `'latest'` — drops queued frames, only the most recent is forwarded
+ * - `{ sample: n }` — forwards every nth frame
+ */
 type Strategy = 'queue' | 'latest' | { sample: number };
 
+/**
+ * Options for a graph edge declared via {@link Graph.connect}.
+ * @property {Strategy} [strategy] - Scheduling strategy for this edge (default: `'queue'`)
+ */
 export interface ConnectOptions {
   strategy?: Strategy;
 }
@@ -165,6 +193,10 @@ export interface ConnectOptions {
 
 const WINDOW = 120;
 
+/**
+ * Collects rolling throughput and latency samples for a single graph node.
+ * Samples are kept in fixed-size windows of {@link WINDOW} entries.
+ */
 class StatsCollector {
   private inputTimes: number[] = [];
   private outputTimes: number[] = [];
@@ -174,6 +206,10 @@ class StatsCollector {
   private latencySamples: number[] = [];
   private driftSamples: number[] = [];
 
+  /**
+   * Records a frame arrival on the input side and starts latency tracking.
+   * @param {Frame} frame - The received frame
+   */
   recordInput(frame: Frame): void {
     const now = Date.now();
     push(this.inputTimes, now);
@@ -183,6 +219,10 @@ class StatsCollector {
     }
   }
 
+  /**
+   * Records a frame emission on the output side and closes the latency sample.
+   * @param {Frame} frame - The emitted frame
+   */
   recordOutput(frame: Frame): void {
     const now = Date.now();
     push(this.outputTimes, now);
@@ -193,10 +233,19 @@ class StatsCollector {
     }
   }
 
+  /**
+   * Records the age of a frame at the renderer's input (wall-clock drift).
+   * @param {Frame} frame - The received frame
+   */
   recordDrift(frame: Frame): void {
     push(this.driftSamples, frame.age());
   }
 
+  /**
+   * Produces a {@link NodeStats} snapshot from the current rolling windows.
+   * @param {string} nodeId - Node identifier to embed in the snapshot
+   * @returns {NodeStats} The computed stats snapshot
+   */
   snapshot(nodeId: string): NodeStats {
     const stats: NodeStats = {
       nodeId,
@@ -210,29 +259,39 @@ class StatsCollector {
   }
 }
 
+/** Appends `val` to `arr`, evicting the oldest entry when the window is full. */
 function push(arr: number[], val: number): void {
   arr.push(val);
   if (arr.length > WINDOW) arr.shift();
 }
 
+/** Computes frames-per-second from an array of wall-clock timestamps (ms). */
 function fps(times: number[]): number {
   if (times.length < 2) return 0;
   const span = times[times.length - 1] - times[0];
   return span > 0 ? (times.length - 1) / (span / 1000) : 0;
 }
 
+/** Returns the `p`th percentile value from `samples` (0–100). */
 function pct(samples: number[], p: number): number {
   if (samples.length === 0) return 0;
   const sorted = [...samples].sort((a, b) => a - b);
   return sorted[Math.floor((p / 100) * (sorted.length - 1))];
 }
 
+/** Returns the arithmetic mean of `samples`. */
 function avg(samples: number[]): number {
   return samples.reduce((a, b) => a + b, 0) / samples.length;
 }
 
 // ─── Strategy application ────────────────────────────────────────────────────
 
+/**
+ * Wraps `source` with the scheduling strategy declared in `options`.
+ * @param {Observable<Frame>} source - The upstream frame observable
+ * @param {ConnectOptions} [options] - Edge options carrying the strategy
+ * @returns {Observable<Frame>} The decorated observable
+ */
 function applyStrategy(
   source: Observable<Frame>,
   options?: ConnectOptions,
@@ -250,6 +309,11 @@ function applyStrategy(
 
 // ─── Port helpers ─────────────────────────────────────────────────────────────
 
+/**
+ * Parses a `"nodeId:portName"` string into its components.
+ * @param {string} ref - Port reference string
+ * @returns {{ nodeId: NodeId; portName: string }} Parsed node ID and port name
+ */
 function parsePortRef(ref: string): { nodeId: NodeId; portName: string } {
   const colon = ref.indexOf(':');
   if (colon === -1)
@@ -259,6 +323,12 @@ function parsePortRef(ref: string): { nodeId: NodeId; portName: string } {
   return { nodeId: ref.slice(0, colon), portName: ref.slice(colon + 1) };
 }
 
+/**
+ * Resolves a named property on `node` and asserts it is an {@link OutputPort}.
+ * @param {BaseDriver | BaseModule | BaseRenderer} node - The source node
+ * @param {string} portName - Name of the port property
+ * @returns {OutputPort} The resolved output port
+ */
 function resolveOutputPort(
   node: BaseDriver | BaseModule | BaseRenderer,
   portName: string,
@@ -269,8 +339,14 @@ function resolveOutputPort(
   return port;
 }
 
+/**
+ * Resolves a named property on `node` and asserts it is an {@link InputPort}.
+ * @param {BaseModule | AsyncModule | BaseRenderer} node - The target node
+ * @param {string} portName - Name of the port property
+ * @returns {InputPort} The resolved input port
+ */
 function resolveInputPort(
-  node: BaseModule | BaseRenderer,
+  node: BaseModule | AsyncModule | BaseRenderer,
   portName: string,
 ): InputPort {
   const port = (node as unknown as Record<string, unknown>)[portName];
