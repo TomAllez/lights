@@ -3,7 +3,7 @@ import { FfmpegDriver } from '@lights/driver-ffmpeg';
 import { WebSocketRenderer } from '@lights/renderer-websocket';
 import { PythonModule, AvailableModule } from '@lights/python-module';
 
-const graph = new Graph();
+const graph = new Graph({ stats: true });
 
 const ffmpeg = new FfmpegDriver({
   width: 640,
@@ -27,6 +27,19 @@ graph.addRenderer('websocket', websocket);
 
 graph.connect('ffmpeg:output', 'handpose:input');
 graph.connect('handpose:output', 'websocket:input');
+
+setInterval(() => {
+  for (const node of graph.getStats()) {
+    console.log(
+      `[${node.nodeId}] in=${node.inputFps.toFixed(1)}fps out=${node.outputFps.toFixed(1)}fps p50=${node.latencyP50}ms p95=${node.latencyP95}ms${
+        node.drift !== undefined
+          ? `                              
+  drift=${node.drift.toFixed(0)}ms`
+          : ''
+      }`,
+    );
+  }
+}, 1000);
 
 console.log('Starting graph...');
 graph.start();

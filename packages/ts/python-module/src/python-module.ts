@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { BaseModule } from '@lights/module';
+import { AsyncModule } from '@lights/module';
 import { Frame, FrameEvent, createFrame } from '@lights/io';
 import { AvailableModule } from './available-module.js';
 
@@ -15,17 +15,17 @@ export type PythonModuleOptions = {
   scriptArgs?: string[];
 };
 
-export class PythonModule extends BaseModule {
+export class PythonModule extends AsyncModule {
   private pythonProcess: ChildProcess | undefined;
   private stdoutBuffer = Buffer.alloc(0);
-  private pendingEvents: FrameEvent[] = [];
+  private pendingResolvers: Array<(events: FrameEvent[]) => void> = [];
 
   private readonly python: string;
   private readonly scriptPath: string;
   private readonly scriptArgs: string[];
 
   constructor(moduleType: AvailableModule, options: PythonModuleOptions = {}) {
-    super(`python-${moduleType}`);
+    super();
     this.python = options.python ?? 'python3';
     const packagesPath = options.packagesPath ?? DEFAULT_PACKAGES_PATH;
     this.scriptPath = path.join(packagesPath, moduleType, 'main.py');
@@ -34,7 +34,6 @@ export class PythonModule extends BaseModule {
 
   override start(): void {
     this.spawnPython();
-    this.attachProcess((frame) => this.processFrame(frame));
     super.start();
   }
 
@@ -42,8 +41,19 @@ export class PythonModule extends BaseModule {
     super.stop();
     this.pythonProcess?.kill('SIGTERM');
     this.pythonProcess = undefined;
-    this.pendingEvents = [];
+    for (const resolve of this.pendingResolvers) resolve([]);
+    this.pendingResolvers = [];
     this.stdoutBuffer = Buffer.alloc(0);
+  }
+
+  async process(frame: Frame): Promise<Frame> {
+    this.sendFrameToPython(frame);
+
+    const pythonEvents = await new Promise<FrameEvent[]>(resolve => {
+      this.pendingResolvers.push(resolve);
+    });
+
+    return rebuildFrame(frame, [...frame.getEvents(), ...pythonEvents]);
   }
 
   private spawnPython(): void {
@@ -66,15 +76,6 @@ export class PythonModule extends BaseModule {
         console.error(`[python-${this.scriptPath}] exited with code ${code}`);
       }
     });
-  }
-
-  private processFrame(frame: Frame): Frame {
-    this.sendFrameToPython(frame);
-
-    const events = [...frame.getEvents(), ...this.pendingEvents];
-    this.pendingEvents = [];
-
-    return rebuildFrame(frame, events);
   }
 
   private sendFrameToPython(frame: Frame): void {
@@ -123,12 +124,14 @@ export class PythonModule extends BaseModule {
 
       try {
         const response = JSON.parse(responseJson) as { events: Array<{ type: string; data: number[] }> };
-        this.pendingEvents = (response.events ?? []).map(e => ({
+        const events: FrameEvent[] = (response.events ?? []).map(e => ({
           type: e.type,
           data: new Uint8Array(e.data),
         }));
+        this.pendingResolvers.shift()?.(events);
       } catch (err) {
         console.error(`[python-${this.scriptPath}] failed to parse response: ${err}`);
+        this.pendingResolvers.shift()?.([]);
       }
     }
   }

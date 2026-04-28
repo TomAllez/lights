@@ -101,6 +101,10 @@ export class Frame {
   getEvents(): FrameEvent[] {
     return this.events;
   }
+
+  age(): number {
+    return Date.now() - this.timestamp;
+  }
 }
 
 /**
