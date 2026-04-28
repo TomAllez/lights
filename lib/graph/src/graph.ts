@@ -168,22 +168,29 @@ const WINDOW = 120;
 class StatsCollector {
   private inputTimes: number[] = [];
   private outputTimes: number[] = [];
-  private inputQueue: number[] = []; // FIFO of receive-times for latency pairing
+  // frame.timestamp → wall-clock time of receipt; bounded to avoid unbounded
+  // growth when frames are dropped (e.g. exhaustMap in AsyncModule).
+  private pendingInput = new Map<number, number>();
   private latencySamples: number[] = [];
   private driftSamples: number[] = [];
 
   recordInput(frame: Frame): void {
     const now = Date.now();
     push(this.inputTimes, now);
-    this.inputQueue.push(now);
-    void frame; // timestamp not needed — we pair by arrival order
+    this.pendingInput.set(frame.getTimestamp(), now);
+    if (this.pendingInput.size > WINDOW) {
+      this.pendingInput.delete(this.pendingInput.keys().next().value!);
+    }
   }
 
-  recordOutput(_frame: Frame): void {
+  recordOutput(frame: Frame): void {
     const now = Date.now();
     push(this.outputTimes, now);
-    const t = this.inputQueue.shift();
-    if (t !== undefined) push(this.latencySamples, now - t);
+    const t = this.pendingInput.get(frame.getTimestamp());
+    if (t !== undefined) {
+      push(this.latencySamples, now - t);
+      this.pendingInput.delete(frame.getTimestamp());
+    }
   }
 
   recordDrift(frame: Frame): void {

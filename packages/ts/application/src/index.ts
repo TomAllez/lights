@@ -17,16 +17,16 @@ const websocket = new WebSocketRenderer({
   height: 480
 });
 
-const handpose = new PythonModule(AvailableModule.HandPoseEstimation, {
+const facemesh = new PythonModule(AvailableModule.FaceMeshEstimation, {
   scriptArgs: ['--width', '640', '--height', '480'],
 });
 
 graph.addDriver('ffmpeg', ffmpeg);
-graph.addModule('handpose', handpose);
+graph.addModule('facemesh', facemesh);
 graph.addRenderer('websocket', websocket);
 
-graph.connect('ffmpeg:output', 'handpose:input');
-graph.connect('handpose:output', 'websocket:input');
+graph.connect('ffmpeg:output', 'facemesh:input');
+graph.connect('facemesh:output', 'websocket:input');
 
 setInterval(() => {
   for (const node of graph.getStats()) {
