@@ -9,12 +9,15 @@
     "targets": {
       "typecheck": {
         "command": "tsc --noEmit",
-        "options": { "cwd": "{projectRoot}" }
+        "options": {
+          "cwd": "{projectRoot}"
+        }
       }
     }
   },
   "dependencies": {
     "react": "*",
-    "react-dom": "*"
+    "react-dom": "*",
+    "three": "^0.184.0"
   }
 }

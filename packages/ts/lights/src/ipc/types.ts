@@ -31,7 +31,7 @@ export type GraphCommand =
 export type GraphEvent =
   | { type: 'calibration:project'; pattern: Pattern }
   | { type: 'calibration:result'; surfaces: Surface[] }
-  | { type: 'frame'; data: ArrayBuffer }
+  | { type: 'frame'; width: number; height: number; data: ArrayBuffer }
   | { type: 'detection'; moduleId: string; position: Point; data: unknown }
   | { type: 'graph:status'; status: 'running' | 'stopped' | 'error' }
 
