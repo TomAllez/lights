@@ -2,8 +2,10 @@
 
 # compiled output
 dist
+dist-electron
 tmp
 out-tsc
+*.tsbuildinfo
 
 # dependencies
 node_modules
