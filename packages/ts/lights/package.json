@@ -1,0 +1,20 @@
+{
+  "name": "@lights/app",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "nx": {
+    "name": "lights",
+    "targets": {
+      "typecheck": {
+        "command": "tsc --noEmit",
+        "options": { "cwd": "{projectRoot}" }
+      }
+    }
+  },
+  "dependencies": {
+    "react": "*",
+    "react-dom": "*"
+  }
+}

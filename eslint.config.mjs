@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import ts from 'typescript-eslint';
 
 export default ts.config(
-  { ignores: ['**/dist/**'] },
+  { ignores: ['**/dist/**', '**/dist-electron/**'] },
   js.configs.recommended,
   ...ts.configs.recommended,
   {
@@ -13,6 +13,7 @@ export default ts.config(
             'lib/*/vitest.config.ts',
             'lib/*/eslint.config.mjs',
             'packages/ts/*/vitest.config.ts',
+            'packages/ts/*/vite.config.ts',
             'packages/ts/*/eslint.config.mjs',
             'vitest.workspace.ts',
             'eslint.base.config.mjs',
