@@ -7,7 +7,8 @@ export type Polygon = Point[]
 // Stubs — filled out in M3 (layers) and M4 (reactions)
 export interface Layer { id: string; type: string }
 export interface Reaction { id: string }
-export interface Calibration {}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface Calibration {} // populated by M5 (camera-to-projector mapping)
 
 export interface Surface {
   id: string
