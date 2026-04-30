@@ -86,8 +86,8 @@ function createWindow() {
   })
 
   win.on('closed', () => {
-    stopStubGraph()
     win = null
+    stopStubGraph()
   })
 
   if (DEV_SERVER_URL) {
