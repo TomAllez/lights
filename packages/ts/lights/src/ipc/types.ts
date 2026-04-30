@@ -32,7 +32,7 @@ export type GraphEvent =
   | { type: 'calibration:project'; pattern: Pattern }
   | { type: 'calibration:result'; surfaces: Surface[] }
   | { type: 'frame'; width: number; height: number; data: ArrayBuffer }
-  | { type: 'detection'; moduleId: string; position: Point; data: unknown }
+  | { type: 'detection'; moduleId: string; position: Point; data: ArrayBuffer }
   | { type: 'graph:status'; status: 'running' | 'stopped' | 'error' }
 
 export interface LightsBridge {
