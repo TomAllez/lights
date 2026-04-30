@@ -15,7 +15,7 @@ export interface GraphConfig {
 
 export type AOIMap = Record<string, Point[]>
 
-export interface Surface {
+export interface SurfaceGeometry {
   id: string
   name: string
   outputPolygon: Point[]
@@ -30,7 +30,7 @@ export type GraphCommand =
 
 export type GraphEvent =
   | { type: 'calibration:project'; pattern: Pattern }
-  | { type: 'calibration:result'; surfaces: Surface[] }
+  | { type: 'calibration:result'; surfaces: SurfaceGeometry[] }
   | { type: 'frame'; width: number; height: number; data: ArrayBuffer }
   | { type: 'detection'; moduleId: string; position: Point; data: ArrayBuffer }
   | { type: 'graph:status'; status: 'running' | 'stopped' | 'error' }
