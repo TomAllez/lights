@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Canvas from './Canvas'
+import SlidePanel from './SlidePanel'
 
 export default function App() {
   const [status, setStatus] = useState<'running' | 'stopped' | 'error'>('stopped')
@@ -12,8 +13,13 @@ export default function App() {
 
   return (
     <div className="app">
-      <Canvas />
-      <span className="status">{status}</span>
+      <SlidePanel />
+      <div className="stage-area">
+        <div className="stage-canvas">
+          <Canvas />
+        </div>
+        <span className="status">{status}</span>
+      </div>
     </div>
   )
 }
