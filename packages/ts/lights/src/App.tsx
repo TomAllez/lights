@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
+import Canvas from './Canvas'
 
 export default function App() {
-  const [status, setStatus] = useState<'connected' | 'running' | 'stopped' | 'error'>('connected')
+  const [status, setStatus] = useState<'running' | 'stopped' | 'error'>('stopped')
 
   useEffect(() => {
     return window.lights.onEvent((event) => {
@@ -11,6 +12,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <Canvas />
       <span className="status">{status}</span>
     </div>
   )

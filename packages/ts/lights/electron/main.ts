@@ -23,7 +23,7 @@ function startStubGraph() {
   }
   emit({ type: 'graph:status', status: 'running' })
   stubInterval = setInterval(() => {
-    emit({ type: 'frame', data: new ArrayBuffer(0) })
+    emit({ type: 'frame', width: 320, height: 240, data: new ArrayBuffer(0) })
   }, 33)
 }
 
