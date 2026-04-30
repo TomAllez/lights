@@ -3,6 +3,8 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
+    "build": "yarn nx run-many -t typecheck",
+    "clean": "find . -path ./node_modules -prune -o -name dist -type d -print | xargs rm -rf && yarn nx reset",
     "lint": "yarn nx run-many -t lint",
     "test": "yarn nx run-many -t test"
   },

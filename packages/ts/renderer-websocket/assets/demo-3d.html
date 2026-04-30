@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Lights — 3D Hand Control</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #08080e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="canvas" width="600" height="600"></canvas>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const W = 600, H = 600;
+
+    // ── Icosahedron ───────────────────────────────────────────────────────────
+    const φ = (1 + Math.sqrt(5)) / 2;
+    const VERTS = [
+      [-1, φ, 0], [1, φ, 0], [-1, -φ, 0], [1, -φ, 0],
+      [0, -1, φ], [0, 1, φ], [0, -1, -φ], [0, 1, -φ],
+      [φ, 0, -1], [φ, 0, 1], [-φ, 0, -1], [-φ, 0, 1],
+    ].map(v => { const l = Math.hypot(...v); return v.map(x => x / l); });
+
+    const FACES = [
+      [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+      [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+      [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+      [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+    ];
+
+    const faceAvgY = FACES.map(([a, b, c]) => (VERTS[a][1] + VERTS[b][1] + VERTS[c][1]) / 3);
+    const minY = Math.min(...faceAvgY), maxY = Math.max(...faceAvgY);
+    const HUES = faceAvgY.map(y => {
+      const t = (y - minY) / (maxY - minY);
+      return ((25 - t * 65) + 360) % 360;
+    });
+
+    // ── Light ─────────────────────────────────────────────────────────────────
+    const LD = [0.3, -0.5, 1.0];
+    const LL = Math.hypot(...LD);
+
+    // ── Animation state ───────────────────────────────────────────────────────
+    let rotX = 0.3, rotY = 0, rotZ = 0;
+    let tRotX = 0.3, tRotY = 0, tRotZ = 0;
+    let zoom = 1.0, tZoom = 1.0;
+
+    let hasHand = false;
+    let prevHasHand = false;
+    let isPinching = false;
+    let mode = 'idle'; // 'idle' | 'open' | 'rotating' | 'zooming'
+
+    const sessionStart = Date.now();
+
+    // ── 3D helpers ────────────────────────────────────────────────────────────
+    function rotate([x, y, z], rx, ry, rz) {
+      const cz = Math.cos(rz), sz = Math.sin(rz);
+      [x, y] = [x * cz - y * sz, x * sz + y * cz];
+      const cx = Math.cos(rx), sx = Math.sin(rx);
+      [y, z] = [y * cx - z * sx, y * sx + z * cx];
+      const cy = Math.cos(ry), sy = Math.sin(ry);
+      [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+      return [x, y, z];
+    }
+
+    function project([x, y, z], scale) {
+      const f = 480 / (z + 3) * scale;
+      return [W / 2 + x * f, H / 2 + y * f];
+    }
+
+    function snapAngle(ref, a) {
+      let d = a - ref;
+      d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI;
+      return ref + d;
+    }
+
+    // ── Overlay helpers ───────────────────────────────────────────────────────
+    function rr(x, y, w, h, r = 6) {
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+    }
+
+    // ── Handpose binary decoder ───────────────────────────────────────────────
+    function decodeHandpose(bytes) {
+      const view = new DataView(bytes.buffer, bytes.byteOffset);
+      const lm = [];
+      for (let i = 0; i < 21; i++) {
+        const o = 1 + i * 12;
+        lm.push({
+          x: view.getFloat32(o, true),
+          y: view.getFloat32(o + 4, true),
+          z: view.getFloat32(o + 8, true),
+        });
+      }
+      return lm;
+    }
+
+    // ── WebSocket ─────────────────────────────────────────────────────────────
+    const ws = new WebSocket('ws://localhost:3000');
+    ws.binaryType = 'arraybuffer';
+    ws.onclose = () => { hasHand = false; };
+
+    ws.onmessage = ({ data }) => {
+      if (typeof data !== 'string') return;
+
+      const msg = JSON.parse(data);
+      if (msg.type !== 'events') return;
+
+      const poses = msg.events
+        .filter(e => e.type === 'handpose')
+        .map(e => decodeHandpose(new Uint8Array(e.data)));
+
+      hasHand = poses.length > 0;
+
+      if (poses.length === 0) {
+        isPinching = false;
+        mode = 'idle';
+        return;
+      }
+
+      if (poses.length >= 2) {
+        const i0 = poses[0][8], i1 = poses[1][8];
+        const dist = Math.hypot(i0.x - i1.x, i0.y - i1.y);
+        tZoom = Math.max(0.2, Math.min(2.8, dist * 3.5));
+        isPinching = false;
+        mode = 'zooming';
+      } else {
+        const lm = poses[0];
+        const pinchDist = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+        isPinching = pinchDist < 0.07;
+        mode = isPinching ? 'rotating' : 'open';
+
+        if (isPinching) {
+          const px = (lm[0].x + lm[9].x) * 0.5;
+          const py = (lm[0].y + lm[9].y) * 0.5;
+          tRotY = (px - 0.5) * Math.PI * 2;
+          tRotX = (py - 0.5) * Math.PI * 2;
+          tRotZ = Math.atan2(lm[9].x - lm[0].x, -(lm[9].y - lm[0].y));
+        }
+      }
+    };
+
+    // ── Overlay ───────────────────────────────────────────────────────────────
+    const ANNOTATIONS = [
+      {
+        bx: 16, by: 172, anchor: [222, 248],
+        label: 'CORE USERS', value: '2.4M', delta: '+18.3% YoY',
+        r: 255, g: 112, b: 67,
+      },
+      {
+        bx: 466, by: 158, anchor: [378, 242],
+        label: 'RETENTION', value: '87.3%', delta: '+5.1pp vs Q3',
+        r: 255, g: 64, b: 129,
+      },
+      {
+        bx: 16, by: 354, anchor: [220, 362],
+        label: 'REVENUE', value: '$12.8M', delta: '+31.0% YoY',
+        r: 255, g: 109, b: 0,
+      },
+      {
+        bx: 466, by: 354, anchor: [378, 360],
+        label: 'NPS SCORE', value: '72', delta: '↑ Excellent',
+        r: 245, g: 0, b: 87,
+      },
+    ];
+    const LW = 118, LH = 62;
+
+    function drawOverlay() {
+      const t = Date.now();
+      const pulse = (Math.sin(t / 700) + 1) / 2;
+
+      ctx.save();
+      ctx.textBaseline = 'middle';
+
+      // ── Top bar ─────────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(6,6,18,0.88)';
+      rr(0, 0, W, 50, 0); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, 50); ctx.lineTo(W, 50); ctx.stroke();
+
+      // Logo
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('PRISM', 18, 25);
+
+      // Live dot
+      ctx.fillStyle = `rgba(255, 60, 60, ${0.55 + pulse * 0.45})`;
+      ctx.beginPath(); ctx.arc(73, 25, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,110,110,0.85)';
+      ctx.font = '10px monospace';
+      ctx.fillText('LIVE', 82, 25);
+
+      // Session title
+      ctx.fillStyle = 'rgba(255,255,255,0.48)';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('User Engagement — Annual Review', W / 2, 25);
+
+      // Slide counter
+      ctx.fillStyle = 'rgba(255,255,255,0.28)';
+      ctx.font = '12px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText('3 / 8', W - 18, 25);
+
+      // ── Annotation labels ────────────────────────────────────────────────────
+      for (const { bx, by, anchor, label, value, delta, r, g, b } of ANNOTATIONS) {
+        const edgeX = bx > W / 2 ? bx : bx + LW;
+        const edgeY = by + LH / 2;
+
+        // Dashed connector
+        ctx.strokeStyle = 'rgba(255,255,255,0.11)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 5]);
+        ctx.beginPath();
+        ctx.moveTo(edgeX, edgeY);
+        ctx.lineTo(anchor[0], anchor[1]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Anchor: filled dot + expanding ring
+        ctx.fillStyle = `rgba(${r},${g},${b},0.85)`;
+        ctx.beginPath(); ctx.arc(anchor[0], anchor[1], 3, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `rgba(${r},${g},${b},${(1 - pulse) * 0.55})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(anchor[0], anchor[1], 5 + pulse * 9, 0, Math.PI * 2); ctx.stroke();
+
+        // Box
+        ctx.fillStyle = 'rgba(8,8,22,0.84)';
+        rr(bx, by, LW, LH, 6); ctx.fill();
+        ctx.strokeStyle = `rgba(${r},${g},${b},0.22)`;
+        ctx.lineWidth = 1;
+        rr(bx, by, LW, LH, 6); ctx.stroke();
+
+        // Top accent bar
+        ctx.fillStyle = `rgba(${r},${g},${b},0.9)`;
+        ctx.fillRect(bx + 6, by, LW - 12, 2);
+
+        // Category
+        ctx.fillStyle = `rgba(${r},${g},${b},0.72)`;
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(label, bx + 10, by + 14);
+
+        // Value
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.font = 'bold 18px monospace';
+        ctx.fillText(value, bx + 10, by + 36);
+
+        // Delta
+        ctx.fillStyle = `rgba(${r},${g},${b},0.85)`;
+        ctx.font = '9px monospace';
+        ctx.fillText(delta, bx + 10, by + 54);
+      }
+
+      // ── Bottom bar ───────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(6,6,18,0.88)';
+      rr(0, H - 46, W, 46, 0); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(0, H - 46); ctx.lineTo(W, H - 46); ctx.stroke();
+
+      // Mode dot + label
+      const [mr, mg, mb] = mode === 'rotating' ? [255, 112, 67]
+        : mode === 'zooming' ? [64, 196, 255]
+          : mode === 'open' ? [160, 160, 160]
+            : [70, 70, 80];
+      ctx.fillStyle = `rgba(${mr},${mg},${mb},${0.65 + pulse * 0.35})`;
+      ctx.beginPath(); ctx.arc(18, H - 23, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.48)';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'left';
+      const modeStr = mode === 'rotating' ? 'Exploring data'
+        : mode === 'zooming' ? 'Zooming in'
+          : mode === 'open' ? 'Standby'
+            : 'Idle';
+      ctx.fillText(modeStr, 28, H - 23);
+
+      // Progress bar + label
+      const bW = 120, bH = 4;
+      const bX = W / 2 - bW / 2, bY = H - 28;
+      ctx.fillStyle = 'rgba(255,255,255,0.07)';
+      rr(bX, bY, bW, bH, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,100,60,0.7)';
+      rr(bX, bY, bW * (3 / 8), bH, 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SLIDE 3 OF 8', W / 2, H - 12);
+
+      // Presenter + timer
+      const elapsed = Math.floor((t - sessionStart) / 1000);
+      const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const ss = String(elapsed % 60).padStart(2, '0');
+      ctx.fillStyle = 'rgba(255,255,255,0.26)';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(`J. Martin  ${mm}:${ss}`, W - 18, H - 23);
+
+      ctx.restore();
+    }
+
+    // ── Render loop ───────────────────────────────────────────────────────────
+    function frame() {
+      requestAnimationFrame(frame);
+
+      if (!hasHand) {
+        tRotY += 0.010;
+        tRotX = Math.sin(tRotY * 0.28) * 0.38;
+        tRotZ += (0 - tRotZ) * 0.02;
+        tZoom += (1.0 - tZoom) * 0.02;
+      }
+
+      if (hasHand && !prevHasHand) {
+        rotX = snapAngle(tRotX, rotX);
+        rotY = snapAngle(tRotY, rotY);
+        rotZ = snapAngle(tRotZ, rotZ);
+      }
+      prevHasHand = hasHand;
+
+      rotX += (tRotX - rotX) * 0.1;
+      rotY += (tRotY - rotY) * 0.1;
+      rotZ += (tRotZ - rotZ) * 0.1;
+      zoom += (tZoom - zoom) * 0.1;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Background glow
+      const [gr, gg, gb] = mode === 'rotating' ? [100, 25, 20]
+        : mode === 'zooming' ? [10, 50, 90]
+          : mode === 'open' ? [60, 15, 40]
+            : [80, 20, 50];
+      const grd = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, 220);
+      grd.addColorStop(0, `rgba(${gr},${gg},${gb},0.45)`);
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+
+      // 3D shape
+      const rv = VERTS.map(v => rotate(v, rotX, rotY, rotZ));
+      const pv = rv.map(v => project(v, zoom));
+
+      const faceData = FACES.map(([a, b, c], i) => {
+        const ra = rv[a], rb = rv[b], rc = rv[c];
+        const ab = [rb[0] - ra[0], rb[1] - ra[1], rb[2] - ra[2]];
+        const ac = [rc[0] - ra[0], rc[1] - ra[1], rc[2] - ra[2]];
+        const nx = ab[1] * ac[2] - ab[2] * ac[1], ny = ab[2] * ac[0] - ab[0] * ac[2], nz = ab[0] * ac[1] - ab[1] * ac[0];
+        const nl = Math.hypot(nx, ny, nz) || 1;
+        const dot = (nx * LD[0] + ny * LD[1] + nz * LD[2]) / (nl * LL);
+        return { a, b, c, dot, depth: (ra[2] + rb[2] + rc[2]) / 3, hue: HUES[i] };
+      });
+
+      faceData.sort((a, b) => a.depth - b.depth);
+
+      for (const { a, b, c, dot, hue } of faceData) {
+        if (dot < 0) continue;
+        const l = (12 + dot * 55) | 0;
+        ctx.beginPath();
+        ctx.moveTo(pv[a][0], pv[a][1]);
+        ctx.lineTo(pv[b][0], pv[b][1]);
+        ctx.lineTo(pv[c][0], pv[c][1]);
+        ctx.closePath();
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = `hsl(${hue},100%,70%)`;
+        ctx.fillStyle = `hsl(${hue},92%,${l}%)`;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = `hsla(${hue},100%,80%,0.15)`;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      }
+
+      drawOverlay();
+    }
+
+    frame();
+  </script>
+</body>
+
+</html>

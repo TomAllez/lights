@@ -1,41 +1,45 @@
-import { Graph } from '@lights/graph';
 import { FfmpegDriver } from '@lights/driver-ffmpeg';
+import { Graph } from '@lights/graph';
+import { AvailableModule, PythonModule } from '@lights/python-module';
 import { WebSocketRenderer } from '@lights/renderer-websocket';
-import { PythonModule, AvailableModule } from '@lights/python-module';
 
 const graph = new Graph({ stats: true });
 
+// const WIDTH = 1280;
+// const HEIGHT = 720;
+const WIDTH = 320;
+const HEIGHT = 240;
+
 const ffmpeg = new FfmpegDriver({
-  width: 640,
-  height: 480,
+  width: WIDTH,
+  height: HEIGHT,
   fps: 30
 });
 
 const websocket = new WebSocketRenderer({
   port: 3000,
-  width: 640,
-  height: 480
+  width: WIDTH,
+  height: HEIGHT
 });
 
-const facemesh = new PythonModule(AvailableModule.FaceMeshEstimation, {
-  scriptArgs: ['--width', '640', '--height', '480'],
+const handPose = new PythonModule(AvailableModule.HandPoseEstimation, {
+  scriptArgs: ['--width', WIDTH.toString(), '--height', HEIGHT.toString()],
 });
 
 graph.addDriver('ffmpeg', ffmpeg);
-graph.addModule('facemesh', facemesh);
+graph.addModule('handpose', handPose);
 graph.addRenderer('websocket', websocket);
 
-graph.connect('ffmpeg:output', 'facemesh:input');
-graph.connect('facemesh:output', 'websocket:input');
+graph.connect('ffmpeg:output', 'handpose:input');
+graph.connect('handpose:output', 'websocket:input');
 
 setInterval(() => {
   for (const node of graph.getStats()) {
     console.log(
-      `[${node.nodeId}] in=${node.inputFps.toFixed(1)}fps out=${node.outputFps.toFixed(1)}fps p50=${node.latencyP50}ms p95=${node.latencyP95}ms${
-        node.drift !== undefined
-          ? `                              
+      `[${node.nodeId}] in=${node.inputFps.toFixed(1)}fps out=${node.outputFps.toFixed(1)}fps p50=${node.latencyP50}ms p95=${node.latencyP95}ms${node.drift !== undefined
+        ? `                              
   drift=${node.drift.toFixed(0)}ms`
-          : ''
+        : ''
       }`,
     );
   }

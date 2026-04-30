@@ -48,6 +48,9 @@
     }
   ],
   "analytics": true,
+  "sync": {
+    "disabledTaskSyncGenerators": ["@nx/js:typescript-sync"]
+  },
   "targetDefaults": {
     "test": {
       "dependsOn": ["^build"]
