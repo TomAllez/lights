@@ -92,6 +92,7 @@ function createWindow() {
 
   if (DEV_SERVER_URL) {
     win.loadURL(DEV_SERVER_URL)
+    win.webContents.openDevTools()
   } else {
     win.loadFile(path.join(process.env.APP_ROOT!, 'dist/index.html'))
   }
