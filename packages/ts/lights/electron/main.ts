@@ -77,6 +77,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1280,
     height: 720,
+    fullscreen: true,
     backgroundColor: '#0a0a0a',
     titleBarStyle: 'hiddenInset',
     webPreferences: {
