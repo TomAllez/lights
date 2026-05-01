@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { SolidLayer, Surface } from './model/types'
+import type { SolidLayer, Surface } from '../model/types'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
   if (visibleLayers.length === 0) return null
 
   const canvas = document.createElement('canvas')
-  canvas.width  = TEX_SIZE
+  canvas.width = TEX_SIZE
   canvas.height = TEX_SIZE
   const ctx = canvas.getContext('2d')!
 
@@ -134,38 +134,38 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
 
   SRC_UVS.forEach(([u, v], i) => {
     const w = H[6] * u + H[7] * v + H[8]
-    positions[i * 3]     = dst[i][0] * w
+    positions[i * 3] = dst[i][0] * w
     positions[i * 3 + 1] = dst[i][1] * w
     positions[i * 3 + 2] = 0
-    uvs[i * 2]     = u
+    uvs[i * 2] = u
     uvs[i * 2 + 1] = v
     ws[i] = w
   })
 
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2))
-  geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+  geo.setAttribute('aW', new THREE.BufferAttribute(ws, 1))
   geo.setIndex([0, 1, 2, 0, 2, 3])
 
   const texture = buildSurfaceTexture(surface)
   const material = texture
     ? new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader: fragmentShaderTexture,
-        uniforms: { uTexture: { value: texture } },
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthTest: false,
-      })
+      vertexShader,
+      fragmentShader: fragmentShaderTexture,
+      uniforms: { uTexture: { value: texture } },
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthTest: false,
+    })
     : new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader: fragmentShaderChecker,
-        uniforms: { uColor: { value: new THREE.Vector3(...COLORS[colorIdx % COLORS.length]) } },
-        transparent: true,
-        side: THREE.DoubleSide,
-        depthTest: false,
-      })
+      vertexShader,
+      fragmentShader: fragmentShaderChecker,
+      uniforms: { uColor: { value: new THREE.Vector3(...COLORS[colorIdx % COLORS.length]) } },
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthTest: false,
+    })
 
   return new THREE.Mesh(geo, material)
 }
@@ -173,6 +173,6 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
 export function disposeSurfaceMesh(mesh: THREE.Mesh): void {
   mesh.geometry.dispose()
   const mat = mesh.material as THREE.ShaderMaterial
-  ;(mat.uniforms.uTexture?.value as THREE.Texture | undefined)?.dispose()
+    ; (mat.uniforms.uTexture?.value as THREE.Texture | undefined)?.dispose()
   mat.dispose()
 }
