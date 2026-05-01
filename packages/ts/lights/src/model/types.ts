@@ -4,7 +4,7 @@ export type { Point, GraphConfig }
 
 export type Polygon = Point[]
 
-export interface SolidLayer { id: string; type: 'solid'; color: string }
+export interface SolidLayer { id: string; type: 'solid'; name: string; visible: boolean; color: string }
 export type Layer = SolidLayer  // union grows in M3
 
 export interface Reaction { id: string }
