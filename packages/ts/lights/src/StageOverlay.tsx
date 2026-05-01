@@ -17,11 +17,15 @@ type DragState = {
   hasMoved: boolean
 } | null
 
+// Double-click detection: track last click per surface, 300 ms window.
+type LastClick = { surfaceId: string; time: number }
+
 export default function StageOverlay() {
   const { state, dispatch } = useProject()
   const svgRef = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [drag, setDrag] = useState<DragState>(null)
+  const lastClickRef = useRef<LastClick | null>(null)
 
   useEffect(() => {
     const el = svgRef.current!
@@ -100,8 +104,19 @@ export default function StageOverlay() {
         })
       }
     } else {
-      // No movement on body pointerdown = select
-      dispatch({ type: 'surface:select', surfaceId: drag.surfaceId })
+      // No movement on body = click. Detect double-click manually to avoid
+      // relying on the dblclick event, which is unreliable when pointer
+      // capture is active on an SVG element.
+      const now = Date.now()
+      const last = lastClickRef.current
+      if (last?.surfaceId === drag.surfaceId && now - last.time < 300) {
+        lastClickRef.current = null
+        dispatch({ type: 'surface:select', surfaceId: drag.surfaceId })
+        dispatch({ type: 'surface:enter' })
+      } else {
+        lastClickRef.current = { surfaceId: drag.surfaceId, time: now }
+        dispatch({ type: 'surface:select', surfaceId: drag.surfaceId })
+      }
     }
 
     setDrag(null)
@@ -138,7 +153,6 @@ export default function StageOverlay() {
               strokeWidth={selected ? 1.5 : 1}
               style={{ cursor: drag ? 'grabbing' : 'move' }}
               onPointerDown={e => startDrag(e, surface, selectedSlideId!, null)}
-              onDoubleClick={() => dispatch({ type: 'surface:enter' })}
             />
             <text
               x={c.x}
