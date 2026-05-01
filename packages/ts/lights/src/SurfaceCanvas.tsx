@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useProject } from './model/ProjectContext'
 import type { Point } from './model/types'
 
@@ -14,12 +14,22 @@ function surfaceAspectRatio(polygon: [Point, Point, Point, Point]): number {
   return h > 0 ? w / h : 16 / 9
 }
 
+// Largest box with aspect ratio `ar` that fits inside `aw × ah`.
+function fitContain(aw: number, ah: number, ar: number) {
+  return aw / ah > ar
+    ? { w: ah * ar, h: ah }
+    : { w: aw, h: aw / ar }
+}
+
 export default function SurfaceCanvas() {
   const { state, dispatch } = useProject()
   const { project, selectedSlideId, selectedSurfaceId } = state
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surface = slide?.surfaces.find(s => s.id === selectedSurfaceId)
+
+  const areaRef = useRef<HTMLDivElement>(null)
+  const [availableSize, setAvailableSize] = useState({ w: 0, h: 0 })
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -29,11 +39,25 @@ export default function SurfaceCanvas() {
     return () => window.removeEventListener('keydown', onKey)
   }, [dispatch])
 
+  useEffect(() => {
+    const el = areaRef.current
+    if (!el) return
+    const obs = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setAvailableSize({ w: width, h: height })
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
   if (!surface || !selectedSlideId) return null
 
   const solidLayer = surface.layers.find(l => l.type === 'solid')
   const fillColor = solidLayer?.type === 'solid' ? solidLayer.color : '#111122'
   const ar = surfaceAspectRatio(surface.outputPolygon)
+
+  const { w: aw, h: ah } = availableSize
+  const { w: canvasW, h: canvasH } = aw > 0 && ah > 0 ? fitContain(aw, ah, ar) : { w: 0, h: 0 }
 
   return (
     <div className="surface-mode">
@@ -46,8 +70,13 @@ export default function SurfaceCanvas() {
         </button>
         <span className="surface-mode-name">{surface.name}</span>
       </div>
-      <div className="surface-mode-canvas-area">
-        <div className="surface-mode-canvas" style={{ aspectRatio: ar, background: fillColor }} />
+      <div ref={areaRef} className="surface-mode-canvas-area">
+        {canvasW > 0 && (
+          <div
+            className="surface-mode-canvas"
+            style={{ width: canvasW, height: canvasH, background: fillColor }}
+          />
+        )}
       </div>
     </div>
   )
