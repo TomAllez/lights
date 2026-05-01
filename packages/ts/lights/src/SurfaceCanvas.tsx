@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProject } from './model/ProjectContext'
-import type { Point } from './model/types'
+import type { Layer, LayerTransform, Point, SolidLayer } from './model/types'
 
 function surfaceAspectRatio(polygon: [Point, Point, Point, Point]): number {
   const stageAr = 16 / 9
@@ -14,21 +14,35 @@ function surfaceAspectRatio(polygon: [Point, Point, Point, Point]): number {
   return h > 0 ? w / h : 16 / 9
 }
 
-// Largest box with aspect ratio `ar` that fits inside `aw × ah`.
 function fitContain(aw: number, ah: number, ar: number) {
   return aw / ah > ar
     ? { w: ah * ar, h: ah }
     : { w: aw, h: aw / ar }
 }
 
+// ── Drag state ────────────────────────────────────────────────────────────────
+
+type Corner = 'tl' | 'tr' | 'br' | 'bl'
+
+type DragKind =
+  | { kind: 'move';   startPx: Point; startT: LayerTransform }
+  | { kind: 'resize'; corner: Corner; startPx: Point; startT: LayerTransform }
+  | { kind: 'rotate'; centerPx: Point; startAngle: number; startRotation: number }
+
+interface ActiveDrag { layerId: string; drag: DragKind; canvasW: number; canvasH: number }
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export default function SurfaceCanvas() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedSurfaceId } = state
+  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId } = state
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surface = slide?.surfaces.find(s => s.id === selectedSurfaceId)
 
-  const areaRef = useRef<HTMLDivElement>(null)
+  const areaRef  = useRef<HTMLDivElement>(null)
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const dragRef  = useRef<ActiveDrag | null>(null)
   const [availableSize, setAvailableSize] = useState({ w: 0, h: 0 })
 
   useEffect(() => {
@@ -52,32 +66,165 @@ export default function SurfaceCanvas() {
 
   if (!surface || !selectedSlideId) return null
 
-  const solidLayer = surface.layers.find(l => l.type === 'solid' && l.visible)
-  const fillColor = solidLayer?.type === 'solid' ? solidLayer.color : '#111122'
   const ar = surfaceAspectRatio(surface.outputPolygon)
-
   const { w: aw, h: ah } = availableSize
   const { w: canvasW, h: canvasH } = aw > 0 && ah > 0 ? fitContain(aw, ah, ar) : { w: 0, h: 0 }
+
+  function toPx(e: React.PointerEvent): Point {
+    const rect = canvasRef.current!.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  function startDrag(e: React.PointerEvent, layerId: string, drag: DragKind) {
+    e.stopPropagation()
+    dragRef.current = { layerId, drag, canvasW, canvasH }
+    canvasRef.current!.setPointerCapture(e.pointerId)
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    const active = dragRef.current
+    if (!active) return
+    const layer = surface!.layers.find(l => l.id === active.layerId)
+    if (!layer) return
+
+    const px = toPx(e)
+    const { drag, canvasW: cw, canvasH: ch } = active
+    let newT: LayerTransform
+
+    if (drag.kind === 'move') {
+      newT = {
+        ...drag.startT,
+        x: drag.startT.x + (px.x - drag.startPx.x) / cw,
+        y: drag.startT.y + (px.y - drag.startPx.y) / ch,
+      }
+    } else if (drag.kind === 'resize') {
+      const { corner, startPx, startT } = drag
+      const dxN = (px.x - startPx.x) / cw
+      const dyN = (px.y - startPx.y) / ch
+      const wSign = corner === 'tl' || corner === 'bl' ? -1 : 1
+      const hSign = corner === 'tl' || corner === 'tr' ? -1 : 1
+      let newW = Math.max(0.02, startT.w + wSign * dxN)
+      let newH = Math.max(0.02, startT.h + hSign * dyN)
+      if (e.shiftKey) {
+        const ratio = startT.w / startT.h
+        if (Math.abs(dxN) >= Math.abs(dyN)) newH = Math.max(0.02, newW / ratio)
+        else newW = Math.max(0.02, newH * ratio)
+      }
+      newT = {
+        ...startT,
+        x: startT.x + (wSign * (newW - startT.w)) / 2,
+        y: startT.y + (hSign * (newH - startT.h)) / 2,
+        w: newW,
+        h: newH,
+      }
+    } else {
+      const { centerPx, startAngle, startRotation } = drag
+      const angle = Math.atan2(px.y - centerPx.y, px.x - centerPx.x) * 180 / Math.PI
+      newT = { ...layer.transform, rotation: startRotation + (angle - startAngle) }
+    }
+
+    dispatch({ type: 'layer:update', slideId: selectedSlideId!, surfaceId: surface!.id, layer: { ...layer, transform: newT } })
+  }
+
+  function handlePointerUp(e: React.PointerEvent) {
+    dragRef.current = null
+    canvasRef.current?.releasePointerCapture(e.pointerId)
+  }
 
   return (
     <div className="surface-mode">
       <div className="surface-mode-header">
-        <button
-          className="back-btn"
-          onClick={() => dispatch({ type: 'surface:exit' })}
-        >
-          ← Stage
-        </button>
+        <button className="back-btn" onClick={() => dispatch({ type: 'surface:exit' })}>← Stage</button>
         <span className="surface-mode-name">{surface.name}</span>
       </div>
       <div ref={areaRef} className="surface-mode-canvas-area">
         {canvasW > 0 && (
           <div
+            ref={canvasRef}
             className="surface-mode-canvas"
-            style={{ width: canvasW, height: canvasH, background: fillColor }}
-          />
+            style={{ width: canvasW, height: canvasH }}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerDown={e => { if (e.target === canvasRef.current) dispatch({ type: 'layer:select', layerId: null }) }}
+          >
+            {[...surface.layers].reverse().filter(l => l.visible).map(layer => (
+              <LayerObject
+                key={layer.id}
+                layer={layer}
+                canvasW={canvasW}
+                canvasH={canvasH}
+                isSelected={layer.id === selectedLayerId}
+                onMoveStart={e => startDrag(e, layer.id, { kind: 'move', startPx: toPx(e), startT: { ...layer.transform } })}
+                onResizeStart={(e, corner) => startDrag(e, layer.id, { kind: 'resize', corner, startPx: toPx(e), startT: { ...layer.transform } })}
+                onRotateStart={e => {
+                  const t = layer.transform
+                  const centerPx = { x: t.x * canvasW, y: t.y * canvasH }
+                  const px = toPx(e)
+                  startDrag(e, layer.id, {
+                    kind: 'rotate',
+                    centerPx,
+                    startAngle: Math.atan2(px.y - centerPx.y, px.x - centerPx.x) * 180 / Math.PI,
+                    startRotation: t.rotation,
+                  })
+                }}
+                onSelect={() => dispatch({ type: 'layer:select', layerId: layer.id })}
+              />
+            ))}
+          </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── LayerObject ───────────────────────────────────────────────────────────────
+
+const CORNERS: Corner[] = ['tl', 'tr', 'br', 'bl']
+
+interface LayerObjectProps {
+  layer: Layer
+  canvasW: number
+  canvasH: number
+  isSelected: boolean
+  onMoveStart: (e: React.PointerEvent) => void
+  onResizeStart: (e: React.PointerEvent, corner: Corner) => void
+  onRotateStart: (e: React.PointerEvent) => void
+  onSelect: () => void
+}
+
+function LayerObject({ layer, canvasW, canvasH, isSelected, onMoveStart, onResizeStart, onRotateStart, onSelect }: LayerObjectProps) {
+  const t = layer.transform
+  const color = layer.type === 'solid' ? (layer as SolidLayer).color : 'transparent'
+
+  return (
+    <div
+      className={`layer-object${isSelected ? ' layer-object--selected' : ''}`}
+      style={{
+        left: t.x * canvasW,
+        top: t.y * canvasH,
+        width: t.w * canvasW,
+        height: t.h * canvasH,
+        transform: `translate(-50%, -50%) rotate(${t.rotation}deg)`,
+        background: color,
+      }}
+      onPointerDown={e => { e.stopPropagation(); onSelect(); onMoveStart(e) }}
+    >
+      {isSelected && (
+        <>
+          {CORNERS.map(corner => (
+            <div
+              key={corner}
+              className={`layer-handle layer-handle--resize-${corner}`}
+              onPointerDown={e => { e.stopPropagation(); onResizeStart(e, corner) }}
+            />
+          ))}
+          <div className="layer-rotate-line" />
+          <div
+            className="layer-handle layer-handle--rotate"
+            onPointerDown={e => { e.stopPropagation(); onRotateStart(e) }}
+          />
+        </>
+      )}
     </div>
   )
 }

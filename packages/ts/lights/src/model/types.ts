@@ -4,7 +4,15 @@ export type { Point, GraphConfig }
 
 export type Polygon = Point[]
 
-export interface SolidLayer { id: string; type: 'solid'; name: string; visible: boolean; color: string }
+export interface LayerTransform {
+  x: number        // center, normalized [0,1]
+  y: number        // center, normalized [0,1]
+  w: number        // width fraction [0,1]
+  h: number        // height fraction [0,1]
+  rotation: number // degrees
+}
+
+export interface SolidLayer { id: string; type: 'solid'; name: string; visible: boolean; color: string; transform: LayerTransform }
 export type Layer = SolidLayer  // union grows in M3
 
 export interface Reaction { id: string }

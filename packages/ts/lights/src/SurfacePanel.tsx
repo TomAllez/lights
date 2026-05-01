@@ -35,8 +35,7 @@ export default function SurfacePanel() {
     return (
       <aside className="surface-panel">
         <div className="surface-panel-header">
-          <button className="back-btn" onClick={() => dispatch({ type: 'surface:exit' })}>← Stage</button>
-          <span className="surface-mode-name">{surface.name}</span>
+          <span>{surface.name}</span>
         </div>
 
         <LayerList

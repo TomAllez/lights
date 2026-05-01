@@ -28,8 +28,8 @@ export default function OutputApp() {
       })
       surfaceGroup.clear()
       slide.surfaces.forEach((surface, i) => {
-        // Only render surfaces that have real content — checkerboard stays editor-only
-        if (surface.layers.some(l => l.type === 'solid' && l.visible)) {
+        // Skip surfaces with no visible layers — checkerboard stays editor-only
+        if (surface.layers.some(l => l.visible)) {
           surfaceGroup.add(buildSurfaceMesh(surface, i))
         }
       })
