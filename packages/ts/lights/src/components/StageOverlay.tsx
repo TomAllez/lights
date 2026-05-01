@@ -6,6 +6,10 @@ import type { Surface, Point } from '../model/types'
 // Drag threshold in normalised stage coords (~5 px on an 800 px canvas).
 const DRAG_THRESHOLD = 0.006
 
+// Arrow-key nudge steps (normalized stage coords).
+const STEP_FINE  = 0.001   // plain arrow
+const STEP_COARSE = 0.01  // shift + arrow
+
 type DragState = {
   surfaceId: string
   slideId: string
@@ -23,11 +27,15 @@ type LastClick = { surfaceId: string; time: number }
 /**
  * SVG overlay that renders surface polygons on the stage.
  *
- * Supports:
+ * Interactions:
  * - Single click  → select surface
  * - Double click  → enter surface-mode editor
- * - Body drag     → translate all four corners
- * - Corner drag   → move individual corner (free-form warp)
+ * - Body drag     → translate all four corners (Shift = H/V axis lock)
+ * - Corner drag   → move individual corner (Shift = H/V axis lock)
+ * - Arrow keys    → nudge focused corner or whole surface (Shift = coarse step)
+ *
+ * "Focused corner" is the last corner clicked/dragged. Body click clears it so
+ * arrow keys move all corners. Visual: focused corner circle is filled blue.
  *
  * Double-click is detected manually (300 ms window) because `dblclick` events
  * are unreliable when pointer capture is active on an SVG element.
@@ -37,6 +45,7 @@ export default function StageOverlay() {
   const svgRef = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [drag, setDrag] = useState<DragState>(null)
+  const [focusedCornerIdx, setFocusedCornerIdx] = useState<number | null>(null)
   const lastClickRef = useRef<LastClick | null>(null)
 
   useEffect(() => {
@@ -52,6 +61,31 @@ export default function StageOverlay() {
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surfaces = slide?.surfaces ?? []
 
+  // ── Arrow key nudge ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const DIRS: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+      ArrowUp: [0, -1], ArrowDown: [0, 1],
+    }
+    function onKey(e: KeyboardEvent) {
+      const dir = DIRS[e.key]
+      if (!dir || !selectedSurfaceId || !selectedSlideId) return
+      e.preventDefault()
+      const surface = surfaces.find(s => s.id === selectedSurfaceId)
+      if (!surface) return
+      const step = e.shiftKey ? STEP_COARSE : STEP_FINE
+      const [dx, dy] = [dir[0] * step, dir[1] * step]
+      const newPolygon = surface.outputPolygon.map((p, i) =>
+        focusedCornerIdx !== null && i !== focusedCornerIdx
+          ? p
+          : { x: Math.max(0, Math.min(1, p.x + dx)), y: Math.max(0, Math.min(1, p.y + dy)) }
+      ) as [Point, Point, Point, Point]
+      dispatch({ type: 'surface:update', slideId: selectedSlideId, surface: { ...surface, outputPolygon: newPolygon } })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedSurfaceId, selectedSlideId, focusedCornerIdx, surfaces, dispatch])
+
   function toNorm(clientX: number, clientY: number): Point {
     const rect = svgRef.current!.getBoundingClientRect()
     return {
@@ -60,7 +94,7 @@ export default function StageOverlay() {
     }
   }
 
-  function px(p: Point) {
+  function toPx(p: Point) {
     return { x: p.x * size.w, y: p.y * size.h }
   }
 
@@ -78,6 +112,7 @@ export default function StageOverlay() {
     cornerIdx: number | null
   ) {
     svgRef.current!.setPointerCapture(e.pointerId)
+    setFocusedCornerIdx(cornerIdx)
     const startPt = toNorm(e.clientX, e.clientY)
     const startPolygon = [...surface.outputPolygon] as [Point, Point, Point, Point]
     setDrag({ surfaceId: surface.id, slideId, startPt, startPolygon, livePolygon: startPolygon, cornerIdx, hasMoved: false })
@@ -92,11 +127,22 @@ export default function StageOverlay() {
 
     let livePolygon: [Point, Point, Point, Point]
     if (drag.cornerIdx !== null) {
-      livePolygon = drag.startPolygon.map((p, i) => i === drag.cornerIdx ? pt : p) as [Point, Point, Point, Point]
+      // Corner drag — Shift locks to H or V relative to the corner's original position
+      let target = pt
+      if (e.shiftKey) {
+        const corner = drag.startPolygon[drag.cornerIdx]
+        target = Math.abs(dx) >= Math.abs(dy)
+          ? { x: pt.x, y: corner.y }   // horizontal lock
+          : { x: corner.x, y: pt.y }   // vertical lock
+      }
+      livePolygon = drag.startPolygon.map((p, i) => i === drag.cornerIdx ? target : p) as [Point, Point, Point, Point]
     } else {
+      // Body drag — Shift locks all corners to H or V movement
+      const effectiveDx = e.shiftKey ? (Math.abs(dx) >= Math.abs(dy) ? dx : 0) : dx
+      const effectiveDy = e.shiftKey ? (Math.abs(dy) >  Math.abs(dx) ? dy : 0) : dy
       livePolygon = drag.startPolygon.map(p => ({
-        x: Math.max(0, Math.min(1, p.x + dx)),
-        y: Math.max(0, Math.min(1, p.y + dy)),
+        x: Math.max(0, Math.min(1, p.x + effectiveDx)),
+        y: Math.max(0, Math.min(1, p.y + effectiveDy)),
       })) as [Point, Point, Point, Point]
     }
 
@@ -150,8 +196,8 @@ export default function StageOverlay() {
       {surfaces.map(surface => {
         const polygon = drag?.surfaceId === surface.id ? drag.livePolygon : surface.outputPolygon
         const selected = surface.id === selectedSurfaceId
-        const c = px(centroid(polygon))
-        const pointsStr = polygon.map(p => { const q = px(p); return `${q.x},${q.y}` }).join(' ')
+        const c = toPx(centroid(polygon))
+        const pointsStr = polygon.map(p => { const q = toPx(p); return `${q.x},${q.y}` }).join(' ')
 
         return (
           <g key={surface.id}>
@@ -175,15 +221,16 @@ export default function StageOverlay() {
               {surface.name}
             </text>
             {polygon.map((p, idx) => {
-              const { x, y } = px(p)
+              const { x, y } = toPx(p)
+              const isFocused = selected && idx === focusedCornerIdx
               return (
                 <circle
                   key={idx}
                   cx={x}
                   cy={y}
-                  r={6}
-                  fill={selected ? '#1e40af' : '#2a2a2a'}
-                  stroke={selected ? '#60a5fa' : '#555'}
+                  r={isFocused ? 7 : 6}
+                  fill={isFocused ? '#60a5fa' : selected ? '#1e40af' : '#2a2a2a'}
+                  stroke={isFocused ? '#fff' : selected ? '#60a5fa' : '#555'}
                   strokeWidth={1.5}
                   style={{ cursor: drag ? 'grabbing' : 'grab' }}
                   onPointerDown={e => { e.stopPropagation(); startDrag(e, surface, selectedSlideId!, idx) }}

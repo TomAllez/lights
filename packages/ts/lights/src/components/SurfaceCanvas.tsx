@@ -13,6 +13,10 @@ type DragKind =
 
 interface ActiveDrag { layerId: string; drag: DragKind; canvasW: number; canvasH: number }
 
+// Arrow-key nudge steps (normalized surface-local coords).
+const STEP_FINE   = 0.005  // plain arrow  (~0.5% of surface)
+const STEP_COARSE = 0.05   // shift+arrow  (~5% of surface)
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 /**
@@ -44,9 +48,10 @@ function fitContain(aw: number, ah: number, ar: number) {
 /**
  * Surface-mode editor: a flat 2D canvas scaled to match the surface's aspect
  * ratio. Each visible layer is rendered as an interactive div that can be:
- * - Dragged to move
+ * - Dragged to move (Shift = H/V axis lock)
  * - Corner-dragged to resize (Shift = aspect-lock)
  * - Rotation-handle-dragged to rotate
+ * - Nudged with arrow keys when selected (Shift = coarse step)
  *
  * Escape exits back to the stage view.
  */
@@ -57,18 +62,43 @@ export default function SurfaceCanvas() {
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surface = slide?.surfaces.find(s => s.id === selectedSurfaceId)
 
-  const areaRef  = useRef<HTMLDivElement>(null)
+  const areaRef   = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
-  const dragRef  = useRef<ActiveDrag | null>(null)
+  const dragRef   = useRef<ActiveDrag | null>(null)
   const [availableSize, setAvailableSize] = useState({ w: 0, h: 0 })
 
+  // ── Keyboard handlers ────────────────────────────────────────────────────
   useEffect(() => {
+    const DIRS: Record<string, [number, number]> = {
+      ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+      ArrowUp: [0, -1], ArrowDown: [0, 1],
+    }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') dispatch({ type: 'surface:exit' })
+      if (e.key === 'Escape') { dispatch({ type: 'surface:exit' }); return }
+
+      const dir = DIRS[e.key]
+      if (!dir || !selectedLayerId || !surface || !selectedSlideId) return
+      e.preventDefault()
+      const layer = surface.layers.find(l => l.id === selectedLayerId)
+      if (!layer) return
+      const step = e.shiftKey ? STEP_COARSE : STEP_FINE
+      dispatch({
+        type: 'layer:update',
+        slideId: selectedSlideId,
+        surfaceId: surface.id,
+        layer: {
+          ...layer,
+          transform: {
+            ...layer.transform,
+            x: layer.transform.x + dir[0] * step,
+            y: layer.transform.y + dir[1] * step,
+          },
+        },
+      })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [dispatch])
+  }, [dispatch, surface, selectedSlideId, selectedLayerId])
 
   useEffect(() => {
     const el = areaRef.current
@@ -109,10 +139,15 @@ export default function SurfaceCanvas() {
     let newT: LayerTransform
 
     if (drag.kind === 'move') {
+      const dxN = (px.x - drag.startPx.x) / cw
+      const dyN = (px.y - drag.startPx.y) / ch
+      // Shift: lock to the dominant axis computed from total delta since drag start
+      const lockH = e.shiftKey && Math.abs(dxN) >= Math.abs(dyN)
+      const lockV = e.shiftKey && Math.abs(dyN) >  Math.abs(dxN)
       newT = {
         ...drag.startT,
-        x: drag.startT.x + (px.x - drag.startPx.x) / cw,
-        y: drag.startT.y + (px.y - drag.startPx.y) / ch,
+        x: drag.startT.x + (lockV ? 0 : dxN),
+        y: drag.startT.y + (lockH ? 0 : dyN),
       }
     } else if (drag.kind === 'resize') {
       const { corner, startPx, startT } = drag
