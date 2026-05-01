@@ -28,6 +28,7 @@ export type ProjectAction =
   | { type: 'slide:remove'; slideId: string }
   | { type: 'slide:select'; slideId: string | null }
   | { type: 'surface:add'; slideId: string }
+  | { type: 'surface:paste'; slideId: string; surface: Surface }
   | { type: 'surface:update'; slideId: string; surface: Surface }
   | { type: 'surface:remove'; slideId: string; surfaceId: string }
   | { type: 'surface:select'; surfaceId: string | null }
@@ -147,6 +148,18 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
         },
       }
     }
+
+    case 'surface:paste':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId ? { ...s, surfaces: [...s.surfaces, action.surface] } : s
+          ),
+        },
+        selectedSurfaceId: action.surface.id,
+      }
 
     case 'surface:update':
       return {

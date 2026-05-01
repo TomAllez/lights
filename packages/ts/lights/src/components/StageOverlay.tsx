@@ -3,6 +3,9 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useProject } from '../model/ProjectContext'
 import type { Surface, Point } from '../model/types'
 
+// Session-only surface clipboard — not persisted in project state.
+let surfaceClipboard: Surface | null = null
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const DRAG_THRESHOLD = 0.006   // normalised stage coords (~5 px on 800 px canvas)
@@ -124,6 +127,36 @@ export default function StageOverlay() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [selectedSurfaceId, selectedSlideId, focusedElement, surfaces, dispatch])
+
+  // ── Copy / paste ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.metaKey || e.ctrlKey)) return
+      if ((e.target as HTMLElement).tagName === 'INPUT') return
+
+      if (e.key === 'c') {
+        const surface = surfaces.find(s => s.id === selectedSurfaceId)
+        if (surface) { e.preventDefault(); surfaceClipboard = surface }
+      } else if (e.key === 'v') {
+        if (!surfaceClipboard || !selectedSlideId) return
+        e.preventDefault()
+        const src = surfaceClipboard
+        const copy: Surface = {
+          ...src,
+          id: crypto.randomUUID(),
+          name: `${src.name} copy`,
+          outputPolygon: src.outputPolygon.map(p => ({
+            x: Math.min(1, p.x + 0.02),
+            y: Math.min(1, p.y + 0.02),
+          })) as [Point, Point, Point, Point],
+          layers: src.layers.map(l => ({ ...l, id: crypto.randomUUID() })),
+        }
+        dispatch({ type: 'surface:paste', slideId: selectedSlideId, surface: copy })
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [selectedSurfaceId, selectedSlideId, surfaces, dispatch])
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
