@@ -23,7 +23,7 @@ export default function SurfaceCanvas() {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') dispatch({ type: 'surface:select', surfaceId: null })
+      if (e.key === 'Escape') dispatch({ type: 'surface:exit' })
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -40,7 +40,7 @@ export default function SurfaceCanvas() {
       <div className="surface-mode-header">
         <button
           className="back-btn"
-          onClick={() => dispatch({ type: 'surface:select', surfaceId: null })}
+          onClick={() => dispatch({ type: 'surface:exit' })}
         >
           ← Stage
         </button>

@@ -3,14 +3,14 @@ import type { SolidLayer } from './model/types'
 
 export default function SurfacePanel() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedSurfaceId } = state
+  const { project, selectedSlideId, selectedSurfaceId, surfaceMode } = state
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surfaces = slide?.surfaces ?? []
   const surface = surfaces.find(s => s.id === selectedSurfaceId)
 
   // ── Surface mode: show editor for the selected surface ──────────────────────
-  if (selectedSurfaceId && surface && selectedSlideId) {
+  if (surfaceMode && surface && selectedSlideId) {
     const solidLayer = surface.layers.find((l): l is SolidLayer => l.type === 'solid')
 
     function setColor(color: string) {
