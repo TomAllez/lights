@@ -10,6 +10,7 @@ import {
   drawHands,
   frameRect,
 } from './canvas/landmarks';
+import { preloadSurfaces } from '../shaders/homography';
 
 /**
  * Main stage canvas: renders the live camera frame as a WebGL texture, overlays
@@ -157,10 +158,15 @@ export default function Canvas() {
     const group = surfaceGroupRef.current;
     if (!group) return;
 
-    surfaces.forEach((surface, i) => group.add(buildSurfaceMesh(surface, i)));
-    renderRef.current();
+    let cancelled = false;
+    preloadSurfaces(surfaces).then(() => {
+      if (cancelled) return;
+      surfaces.forEach((surface, i) => group.add(buildSurfaceMesh(surface, i)));
+      renderRef.current();
+    });
 
     return () => {
+      cancelled = true;
       group.traverse((child) => {
         if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
       });

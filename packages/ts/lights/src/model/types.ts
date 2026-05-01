@@ -13,7 +13,11 @@ export interface LayerTransform {
 }
 
 export interface SolidLayer { id: string; type: 'solid'; name: string; visible: boolean; color: string; transform: LayerTransform }
-export type Layer = SolidLayer  // union grows in M3
+
+/** Image layer — src is an absolute file path (or data: URL when serialised). */
+export interface ImageLayer { id: string; type: 'image'; name: string; visible: boolean; src: string; transform: LayerTransform }
+
+export type Layer = SolidLayer | ImageLayer
 
 export interface Reaction { id: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

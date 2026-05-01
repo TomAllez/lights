@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { SolidLayer, Surface } from '../model/types'
+import type { ImageLayer, SolidLayer, Surface } from '../model/types'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -74,6 +74,41 @@ function computeHomography(src: [number, number][], dst: [number, number][]): nu
   return [...gaussianElim(A, b), 1]
 }
 
+// ── Image cache ───────────────────────────────────────────────────────────────
+
+/** Module-level cache so images survive across mesh rebuilds. */
+const imgCache = new Map<string, HTMLImageElement>()
+
+function toFileUrl(src: string): string {
+  return src.startsWith('data:') || src.startsWith('file://') ? src : `file://${src}`
+}
+
+function loadImg(src: string): Promise<HTMLImageElement | null> {
+  const url = toFileUrl(src)
+  if (imgCache.has(url)) return Promise.resolve(imgCache.get(url)!)
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => { imgCache.set(url, img); resolve(img) }
+    img.onerror = () => resolve(null)
+    img.src = url
+  })
+}
+
+/**
+ * Pre-load all image-layer assets referenced by the given surfaces into the
+ * module cache so that `buildSurfaceMesh` / `buildSurfaceTexture` can run
+ * synchronously. Call this before rebuilding meshes whenever surfaces change.
+ */
+export async function preloadSurfaces(surfaces: Surface[]): Promise<void> {
+  const srcs: string[] = []
+  for (const s of surfaces) {
+    for (const l of s.layers) {
+      if (l.type === 'image' && l.visible) srcs.push((l as ImageLayer).src)
+    }
+  }
+  await Promise.all(srcs.map(loadImg))
+}
+
 // ── Texture compositor ────────────────────────────────────────────────────────
 
 // Composite all visible layers onto an offscreen canvas (surface local space,
@@ -85,21 +120,31 @@ function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
   if (visibleLayers.length === 0) return null
 
   const canvas = document.createElement('canvas')
-  canvas.width = TEX_SIZE
+  canvas.width  = TEX_SIZE
   canvas.height = TEX_SIZE
   const ctx = canvas.getContext('2d')!
 
   // Render bottom-to-top: surface.layers[0] is the top layer in the panel,
   // so we iterate in reverse to draw the backmost layer first.
   for (const layer of [...surface.layers].reverse()) {
-    if (!layer.visible || layer.type !== 'solid') continue
-    const l = layer as SolidLayer
-    const t = l.transform
+    if (!layer.visible) continue
+
+    const t = layer.transform
     ctx.save()
     ctx.translate(t.x * TEX_SIZE, t.y * TEX_SIZE)
     ctx.rotate(t.rotation * Math.PI / 180)
-    ctx.fillStyle = l.color
-    ctx.fillRect(-t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
+
+    if (layer.type === 'solid') {
+      const l = layer as SolidLayer
+      ctx.fillStyle = l.color
+      ctx.fillRect(-t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
+    } else if (layer.type === 'image') {
+      const img = imgCache.get(toFileUrl((layer as ImageLayer).src))
+      if (img) {
+        ctx.drawImage(img, -t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
+      }
+    }
+
     ctx.restore()
   }
 
@@ -134,38 +179,38 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
 
   SRC_UVS.forEach(([u, v], i) => {
     const w = H[6] * u + H[7] * v + H[8]
-    positions[i * 3] = dst[i][0] * w
+    positions[i * 3]     = dst[i][0] * w
     positions[i * 3 + 1] = dst[i][1] * w
     positions[i * 3 + 2] = 0
-    uvs[i * 2] = u
+    uvs[i * 2]     = u
     uvs[i * 2 + 1] = v
     ws[i] = w
   })
 
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
-  geo.setAttribute('aW', new THREE.BufferAttribute(ws, 1))
+  geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2))
+  geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
   geo.setIndex([0, 1, 2, 0, 2, 3])
 
   const texture = buildSurfaceTexture(surface)
   const material = texture
     ? new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader: fragmentShaderTexture,
-      uniforms: { uTexture: { value: texture } },
-      transparent: true,
-      side: THREE.DoubleSide,
-      depthTest: false,
-    })
+        vertexShader,
+        fragmentShader: fragmentShaderTexture,
+        uniforms: { uTexture: { value: texture } },
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthTest: false,
+      })
     : new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader: fragmentShaderChecker,
-      uniforms: { uColor: { value: new THREE.Vector3(...COLORS[colorIdx % COLORS.length]) } },
-      transparent: true,
-      side: THREE.DoubleSide,
-      depthTest: false,
-    })
+        vertexShader,
+        fragmentShader: fragmentShaderChecker,
+        uniforms: { uColor: { value: new THREE.Vector3(...COLORS[colorIdx % COLORS.length]) } },
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthTest: false,
+      })
 
   return new THREE.Mesh(geo, material)
 }
@@ -173,6 +218,6 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
 export function disposeSurfaceMesh(mesh: THREE.Mesh): void {
   mesh.geometry.dispose()
   const mat = mesh.material as THREE.ShaderMaterial
-    ; (mat.uniforms.uTexture?.value as THREE.Texture | undefined)?.dispose()
+  ;(mat.uniforms.uTexture?.value as THREE.Texture | undefined)?.dispose()
   mat.dispose()
 }

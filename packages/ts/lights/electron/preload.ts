@@ -14,6 +14,7 @@ const bridge: LightsBridge = {
     ipcRenderer.on('output:render', listener)
     return () => ipcRenderer.off('output:render', listener)
   },
+  pickImageFile: () => ipcRenderer.invoke('dialog:pick-image') as Promise<string | null>,
 }
 
 contextBridge.exposeInMainWorld('lights', bridge)

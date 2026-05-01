@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import type { GraphCommand, GraphEvent } from '../src/ipc/types'
@@ -63,6 +63,14 @@ function stopStubGraph() {
   }
   emit({ type: 'graph:status', status: 'stopped' })
 }
+
+ipcMain.handle('dialog:pick-image', async () => {
+  const result = await dialog.showOpenDialog(win!, {
+    properties: ['openFile'],
+    filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'] }],
+  })
+  return result.canceled ? null : result.filePaths[0]
+})
 
 ipcMain.on('output:slide', (_event, slide: unknown) => {
   lastSlide = slide

@@ -1,5 +1,9 @@
 import { useState } from 'react'
-import type { Layer, SolidLayer } from '../model/types'
+import type { ImageLayer, Layer, SolidLayer } from '../model/types'
+
+function toFileUrl(src: string): string {
+  return src.startsWith('data:') || src.startsWith('file://') ? src : `file://${src}`
+}
 
 interface LayerListProps {
   surface: { layers: Layer[] }
@@ -9,6 +13,7 @@ interface LayerListProps {
   onRemove: (id: string) => void
   onReorder: (ids: string[]) => void
   onAdd: () => void
+  onAddImage: () => void
 }
 
 /**
@@ -16,8 +21,9 @@ interface LayerListProps {
  * - Click to select
  * - Drag-and-drop reordering (HTML5 DnD)
  * - Visibility toggle (●/○)
- * - Color swatch preview
+ * - Color swatch for solid layers / thumbnail for image layers
  * - Per-layer remove button
+ * - Add solid layer (+) and add image layer (img) buttons
  */
 export default function LayerList({
   surface,
@@ -27,6 +33,7 @@ export default function LayerList({
   onRemove,
   onReorder,
   onAdd,
+  onAddImage,
 }: LayerListProps) {
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dropIdx, setDropIdx] = useState<number | null>(null)
@@ -60,7 +67,10 @@ export default function LayerList({
     <div className="layer-panel">
       <div className="layer-panel-header">
         <span>Layers</span>
-        <button className="icon-btn" title="Add layer" onClick={onAdd}>+</button>
+        <div className="layer-panel-actions">
+          <button className="icon-btn" title="Add solid layer" onClick={onAdd}>+</button>
+          <button className="icon-btn icon-btn--img" title="Add image layer" onClick={onAddImage}>img</button>
+        </div>
       </div>
 
       {surface.layers.length === 0 ? (
@@ -94,6 +104,14 @@ export default function LayerList({
               <span className="layer-name">{layer.name}</span>
               {layer.type === 'solid' && (
                 <span className="layer-color-swatch" style={{ background: (layer as SolidLayer).color }} />
+              )}
+              {layer.type === 'image' && (
+                <img
+                  className="layer-thumbnail"
+                  src={toFileUrl((layer as ImageLayer).src)}
+                  alt=""
+                  draggable={false}
+                />
               )}
               <button
                 className="icon-btn layer-remove"

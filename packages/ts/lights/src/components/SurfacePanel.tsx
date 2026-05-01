@@ -26,6 +26,12 @@ export default function SurfacePanel() {
       dispatch({ type: 'layer:add', slideId: selectedSlideId!, surfaceId: surface!.id })
     }
 
+    async function addImageLayer() {
+      const src = await window.lights.pickImageFile()
+      if (!src) return
+      dispatch({ type: 'layer:add-image', slideId: selectedSlideId!, surfaceId: surface!.id, src })
+    }
+
     function removeLayer(layerId: string) {
       dispatch({ type: 'layer:remove', slideId: selectedSlideId!, surfaceId: surface!.id, layerId })
     }
@@ -53,6 +59,7 @@ export default function SurfacePanel() {
           onRemove={removeLayer}
           onReorder={ids => dispatch({ type: 'layer:reorder', slideId: selectedSlideId!, surfaceId: surface!.id, layerIds: ids })}
           onAdd={addLayer}
+          onAddImage={addImageLayer}
         />
 
         {solidLayer && (

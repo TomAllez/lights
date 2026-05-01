@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { Slide } from './model/types';
-import { buildSurfaceMesh, disposeSurfaceMesh } from './shaders/homography';
+import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces } from './shaders/homography';
 
 export default function OutputApp() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,11 +24,12 @@ export default function OutputApp() {
       renderer.render(scene, camera);
     }
 
-    function renderSlide(slide: Slide) {
+    async function renderSlide(slide: Slide) {
       surfaceGroup.traverse((child) => {
         if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
       });
       surfaceGroup.clear();
+      await preloadSurfaces(slide.surfaces);
       slide.surfaces.forEach((surface, i) => {
         // Skip surfaces with no visible layers — checkerboard stays editor-only
         if (surface.layers.some((l) => l.visible)) {
@@ -38,9 +39,9 @@ export default function OutputApp() {
       render();
     }
 
-    const off = window.lights.onOutputRender((data) =>
-      renderSlide(data as Slide),
-    );
+    const off = window.lights.onOutputRender((data) => {
+      renderSlide(data as Slide);
+    });
 
     function updateLayout() {
       const { clientWidth: w, clientHeight: h } = container;

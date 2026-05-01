@@ -40,6 +40,8 @@ export interface LightsBridge {
   onEvent: (handler: (event: GraphEvent) => void) => () => void
   sendSlide: (slide: unknown) => void
   onOutputRender: (handler: (slide: unknown) => void) => () => void
+  /** Open the native OS file picker filtered to image types. Returns the absolute path or null if cancelled. */
+  pickImageFile: () => Promise<string | null>
 }
 
 declare global {

@@ -1,4 +1,4 @@
-import type { Layer, SolidLayer } from '../model/types'
+import type { ImageLayer, Layer, SolidLayer } from '../model/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,6 +17,10 @@ interface LayerObjectProps {
 }
 
 const CORNERS: Corner[] = ['tl', 'tr', 'br', 'bl']
+
+function toFileUrl(src: string): string {
+  return src.startsWith('data:') || src.startsWith('file://') ? src : `file://${src}`
+}
 
 /**
  * A single layer rendered as a positioned, rotated div inside the surface
@@ -37,7 +41,17 @@ export default function LayerObject({
   onSelect,
 }: LayerObjectProps) {
   const t = layer.transform
-  const color = layer.type === 'solid' ? (layer as SolidLayer).color : 'transparent'
+
+  const bgStyle: React.CSSProperties =
+    layer.type === 'solid'
+      ? { background: (layer as SolidLayer).color }
+      : layer.type === 'image'
+        ? {
+            backgroundImage: `url("${toFileUrl((layer as ImageLayer).src)}")`,
+            backgroundSize: '100% 100%',
+            backgroundRepeat: 'no-repeat',
+          }
+        : {}
 
   return (
     <div
@@ -48,7 +62,7 @@ export default function LayerObject({
         width: t.w * canvasW,
         height: t.h * canvasH,
         transform: `translate(-50%, -50%) rotate(${t.rotation}deg)`,
-        background: color,
+        ...bgStyle,
       }}
       onPointerDown={e => { e.stopPropagation(); onSelect(); onMoveStart(e) }}
     >

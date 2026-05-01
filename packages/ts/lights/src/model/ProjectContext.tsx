@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { Layer, Project, Slide, Surface } from './types'
+import type { ImageLayer, Layer, Project, Slide, Surface } from './types'
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,7 @@ export type ProjectAction =
   | { type: 'surface:enter' }   // double-click → open flat editor
   | { type: 'surface:exit' }    // back / Escape → return to stage, keep selection
   | { type: 'layer:add'; slideId: string; surfaceId: string }
+  | { type: 'layer:add-image'; slideId: string; surfaceId: string; src: string }
   | { type: 'layer:remove'; slideId: string; surfaceId: string; layerId: string }
   | { type: 'layer:update'; slideId: string; surfaceId: string; layer: Layer }
   | { type: 'layer:reorder'; slideId: string; surfaceId: string; layerIds: string[] }
@@ -174,6 +175,25 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
         visible: true,
         color: '#3a6ea5',
         transform: { x: 0.5, y: 0.5, w: 0.8, h: 0.8, rotation: 0 },
+      }
+      return {
+        ...patchSurfaceLayers(state, action.slideId, action.surfaceId, layers => [layer, ...layers]),
+        selectedLayerId: layer.id,
+      }
+    }
+
+    case 'layer:add-image': {
+      const slide = project.slides.find(s => s.id === action.slideId)
+      const surface = slide?.surfaces.find(sf => sf.id === action.surfaceId)
+      if (!surface) return state
+      const fileName = action.src.split('/').pop() ?? 'image'
+      const layer: ImageLayer = {
+        id: crypto.randomUUID(),
+        type: 'image',
+        name: fileName,
+        visible: true,
+        src: action.src,
+        transform: { x: 0.5, y: 0.5, w: 1.0, h: 1.0, rotation: 0 },
       }
       return {
         ...patchSurfaceLayers(state, action.slideId, action.surfaceId, layers => [layer, ...layers]),

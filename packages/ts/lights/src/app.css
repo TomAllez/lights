@@ -335,6 +335,16 @@ html, body, #root {
   text-transform: uppercase;
 }
 
+.layer-panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.icon-btn--img {
+  width: 28px;
+  font-size: 9px;
+}
+
 .layer-list {
   overflow-y: auto;
   padding: 4px 8px;
@@ -402,6 +412,15 @@ html, body, #root {
 .layer-color-swatch {
   width: 12px;
   height: 12px;
+  border-radius: 2px;
+  border: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.layer-thumbnail {
+  width: 20px;
+  height: 14px;
+  object-fit: cover;
   border-radius: 2px;
   border: 1px solid #333;
   flex-shrink: 0;
