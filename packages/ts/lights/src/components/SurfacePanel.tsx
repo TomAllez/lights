@@ -27,9 +27,9 @@ export default function SurfacePanel() {
     }
 
     async function addImageLayer() {
-      const src = await window.lights.pickImageFile()
-      if (!src) return
-      dispatch({ type: 'layer:add-image', slideId: selectedSlideId!, surfaceId: surface!.id, src })
+      const result = await window.lights.pickImageFile()
+      if (!result) return
+      dispatch({ type: 'layer:add-image', slideId: selectedSlideId!, surfaceId: surface!.id, src: result.src, name: result.name })
     }
 
     function removeLayer(layerId: string) {

@@ -33,7 +33,7 @@ export type ProjectAction =
   | { type: 'surface:enter' }   // double-click → open flat editor
   | { type: 'surface:exit' }    // back / Escape → return to stage, keep selection
   | { type: 'layer:add'; slideId: string; surfaceId: string }
-  | { type: 'layer:add-image'; slideId: string; surfaceId: string; src: string }
+  | { type: 'layer:add-image'; slideId: string; surfaceId: string; src: string; name: string }
   | { type: 'layer:remove'; slideId: string; surfaceId: string; layerId: string }
   | { type: 'layer:update'; slideId: string; surfaceId: string; layer: Layer }
   | { type: 'layer:reorder'; slideId: string; surfaceId: string; layerIds: string[] }
@@ -186,11 +186,10 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
       const slide = project.slides.find(s => s.id === action.slideId)
       const surface = slide?.surfaces.find(sf => sf.id === action.surfaceId)
       if (!surface) return state
-      const fileName = action.src.split('/').pop() ?? 'image'
       const layer: ImageLayer = {
         id: crypto.randomUUID(),
         type: 'image',
-        name: fileName,
+        name: action.name,
         visible: true,
         src: action.src,
         transform: { x: 0.5, y: 0.5, w: 1.0, h: 1.0, rotation: 0 },

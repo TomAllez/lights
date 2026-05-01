@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { fileURLToPath } from 'node:url'
+import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { GraphCommand, GraphEvent } from '../src/ipc/types'
 
@@ -69,7 +70,18 @@ ipcMain.handle('dialog:pick-image', async () => {
     properties: ['openFile'],
     filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'] }],
   })
-  return result.canceled ? null : result.filePaths[0]
+  if (result.canceled || result.filePaths.length === 0) return null
+
+  const filePath = result.filePaths[0]
+  const ext = path.extname(filePath).slice(1).toLowerCase()
+  const mime =
+    ext === 'png'  ? 'image/png'      :
+    ext === 'gif'  ? 'image/gif'      :
+    ext === 'webp' ? 'image/webp'     :
+    ext === 'svg'  ? 'image/svg+xml'  :
+                     'image/jpeg'
+  const data = await fs.readFile(filePath)
+  return { name: path.basename(filePath), src: `data:${mime};base64,${data.toString('base64')}` }
 })
 
 ipcMain.on('output:slide', (_event, slide: unknown) => {

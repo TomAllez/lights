@@ -76,21 +76,16 @@ function computeHomography(src: [number, number][], dst: [number, number][]): nu
 
 // ── Image cache ───────────────────────────────────────────────────────────────
 
-/** Module-level cache so images survive across mesh rebuilds. */
+/** Module-level cache keyed by src (data URL). Survives across mesh rebuilds. */
 const imgCache = new Map<string, HTMLImageElement>()
 
-function toFileUrl(src: string): string {
-  return src.startsWith('data:') || src.startsWith('file://') ? src : `file://${src}`
-}
-
 function loadImg(src: string): Promise<HTMLImageElement | null> {
-  const url = toFileUrl(src)
-  if (imgCache.has(url)) return Promise.resolve(imgCache.get(url)!)
+  if (imgCache.has(src)) return Promise.resolve(imgCache.get(src)!)
   return new Promise(resolve => {
     const img = new Image()
-    img.onload = () => { imgCache.set(url, img); resolve(img) }
+    img.onload = () => { imgCache.set(src, img); resolve(img) }
     img.onerror = () => resolve(null)
-    img.src = url
+    img.src = src
   })
 }
 
@@ -139,7 +134,7 @@ function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
       ctx.fillStyle = l.color
       ctx.fillRect(-t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
     } else if (layer.type === 'image') {
-      const img = imgCache.get(toFileUrl((layer as ImageLayer).src))
+      const img = imgCache.get((layer as ImageLayer).src)
       if (img) {
         ctx.drawImage(img, -t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
       }

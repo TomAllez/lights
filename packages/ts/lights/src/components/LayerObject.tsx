@@ -18,10 +18,6 @@ interface LayerObjectProps {
 
 const CORNERS: Corner[] = ['tl', 'tr', 'br', 'bl']
 
-function toFileUrl(src: string): string {
-  return src.startsWith('data:') || src.startsWith('file://') ? src : `file://${src}`
-}
-
 /**
  * A single layer rendered as a positioned, rotated div inside the surface
  * canvas. When selected it shows four corner resize handles, a rotation handle
@@ -47,7 +43,7 @@ export default function LayerObject({
       ? { background: (layer as SolidLayer).color }
       : layer.type === 'image'
         ? {
-            backgroundImage: `url("${toFileUrl((layer as ImageLayer).src)}")`,
+            backgroundImage: `url("${(layer as ImageLayer).src}")`,
             backgroundSize: '100% 100%',
             backgroundRepeat: 'no-repeat',
           }

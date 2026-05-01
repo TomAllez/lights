@@ -1,10 +1,6 @@
 import { useState } from 'react'
 import type { ImageLayer, Layer, SolidLayer } from '../model/types'
 
-function toFileUrl(src: string): string {
-  return src.startsWith('data:') || src.startsWith('file://') ? src : `file://${src}`
-}
-
 interface LayerListProps {
   surface: { layers: Layer[] }
   selectedLayerId: string | null
@@ -108,7 +104,7 @@ export default function LayerList({
               {layer.type === 'image' && (
                 <img
                   className="layer-thumbnail"
-                  src={toFileUrl((layer as ImageLayer).src)}
+                  src={(layer as ImageLayer).src}
                   alt=""
                   draggable={false}
                 />
