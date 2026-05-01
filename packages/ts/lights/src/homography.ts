@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { Surface } from './model/types'
+import type { SolidLayer, Surface } from './model/types'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ void main() {
 }
 `
 
-const fragmentShader = /* glsl */`
+const fragmentShaderChecker = /* glsl */`
 varying vec2 vUv;
 uniform vec3 uColor;
 void main() {
@@ -24,6 +24,19 @@ void main() {
   gl_FragColor = vec4(col, 0.8);
 }
 `
+
+const fragmentShaderSolid = /* glsl */`
+varying vec2 vUv;
+uniform vec3 uColor;
+void main() {
+  gl_FragColor = vec4(uColor, 1.0);
+}
+`
+
+function hexToVec3(hex: string): THREE.Vector3 {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return new THREE.Vector3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
+}
 
 // ── Math ─────────────────────────────────────────────────────────────────────
 
@@ -107,15 +120,24 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
   geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
   geo.setIndex([0, 1, 2, 0, 2, 3])
 
-  const color = COLORS[colorIdx % COLORS.length]
-  const material = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader,
-    uniforms: { uColor: { value: new THREE.Vector3(...color) } },
-    transparent: true,
-    side: THREE.DoubleSide,
-    depthTest: false,
-  })
+  const solidLayer = surface.layers.find((l): l is SolidLayer => l.type === 'solid')
+  const material = solidLayer
+    ? new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader: fragmentShaderSolid,
+        uniforms: { uColor: { value: hexToVec3(solidLayer.color) } },
+        transparent: false,
+        side: THREE.DoubleSide,
+        depthTest: false,
+      })
+    : new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader: fragmentShaderChecker,
+        uniforms: { uColor: { value: new THREE.Vector3(...COLORS[colorIdx % COLORS.length]) } },
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthTest: false,
+      })
 
   return new THREE.Mesh(geo, material)
 }

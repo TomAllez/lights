@@ -4,8 +4,9 @@ export type { Point, GraphConfig }
 
 export type Polygon = Point[]
 
-// Stubs — filled out in M3 (layers) and M4 (reactions)
-export interface Layer { id: string; type: string }
+export interface SolidLayer { id: string; type: 'solid'; color: string }
+export type Layer = SolidLayer  // union grows in M3
+
 export interface Reaction { id: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Calibration {} // populated by M5 (camera-to-projector mapping)
