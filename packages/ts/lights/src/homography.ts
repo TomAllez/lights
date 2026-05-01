@@ -25,18 +25,14 @@ void main() {
 }
 `
 
-const fragmentShaderSolid = /* glsl */`
+// Flip V to compensate for Three.js's default flipY on canvas textures
+const fragmentShaderTexture = /* glsl */`
 varying vec2 vUv;
-uniform vec3 uColor;
+uniform sampler2D uTexture;
 void main() {
-  gl_FragColor = vec4(uColor, 1.0);
+  gl_FragColor = texture2D(uTexture, vec2(vUv.x, 1.0 - vUv.y));
 }
 `
-
-function hexToVec3(hex: string): THREE.Vector3 {
-  const n = parseInt(hex.replace('#', ''), 16)
-  return new THREE.Vector3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255)
-}
 
 // ── Math ─────────────────────────────────────────────────────────────────────
 
@@ -76,6 +72,38 @@ function computeHomography(src: [number, number][], dst: [number, number][]): nu
     b.push(y)
   }
   return [...gaussianElim(A, b), 1]
+}
+
+// ── Texture compositor ────────────────────────────────────────────────────────
+
+// Composite all visible layers onto an offscreen canvas (surface local space,
+// Y-down), then wrap it in a Three.js CanvasTexture. Returns null if no layers.
+const TEX_SIZE = 512
+
+function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
+  const visibleLayers = surface.layers.filter(l => l.visible)
+  if (visibleLayers.length === 0) return null
+
+  const canvas = document.createElement('canvas')
+  canvas.width  = TEX_SIZE
+  canvas.height = TEX_SIZE
+  const ctx = canvas.getContext('2d')!
+
+  // Render bottom-to-top: surface.layers[0] is the top layer in the panel,
+  // so we iterate in reverse to draw the backmost layer first.
+  for (const layer of [...surface.layers].reverse()) {
+    if (!layer.visible || layer.type !== 'solid') continue
+    const l = layer as SolidLayer
+    const t = l.transform
+    ctx.save()
+    ctx.translate(t.x * TEX_SIZE, t.y * TEX_SIZE)
+    ctx.rotate(t.rotation * Math.PI / 180)
+    ctx.fillStyle = l.color
+    ctx.fillRect(-t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
+    ctx.restore()
+  }
+
+  return new THREE.CanvasTexture(canvas)
 }
 
 // ── Mesh builder ─────────────────────────────────────────────────────────────
@@ -120,13 +148,13 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
   geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
   geo.setIndex([0, 1, 2, 0, 2, 3])
 
-  const solidLayer = surface.layers.find((l): l is SolidLayer => l.type === 'solid' && l.visible)
-  const material = solidLayer
+  const texture = buildSurfaceTexture(surface)
+  const material = texture
     ? new THREE.ShaderMaterial({
         vertexShader,
-        fragmentShader: fragmentShaderSolid,
-        uniforms: { uColor: { value: hexToVec3(solidLayer.color) } },
-        transparent: false,
+        fragmentShader: fragmentShaderTexture,
+        uniforms: { uTexture: { value: texture } },
+        transparent: true,
         side: THREE.DoubleSide,
         depthTest: false,
       })
@@ -144,5 +172,7 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
 
 export function disposeSurfaceMesh(mesh: THREE.Mesh): void {
   mesh.geometry.dispose()
-  ;(mesh.material as THREE.Material).dispose()
+  const mat = mesh.material as THREE.ShaderMaterial
+  ;(mat.uniforms.uTexture?.value as THREE.Texture | undefined)?.dispose()
+  mat.dispose()
 }

@@ -172,7 +172,8 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
         type: 'solid',
         name: `Layer ${surface.layers.length + 1}`,
         visible: true,
-        color: '#111122',
+        color: '#3a6ea5',
+        transform: { x: 0.5, y: 0.5, w: 0.8, h: 0.8, rotation: 0 },
       }
       return {
         ...patchSurfaceLayers(state, action.slideId, action.surfaceId, layers => [layer, ...layers]),

@@ -267,6 +267,53 @@ html, body, #root {
 
 .surface-mode-canvas {
   flex-shrink: 0;
+  position: relative;
+  background: #111;
+  user-select: none;
+}
+
+/* ── Layer objects & handles ─────────────────────────────────────────────── */
+
+.layer-object {
+  position: absolute;
+  box-sizing: border-box;
+  cursor: move;
+}
+
+.layer-object--selected {
+  outline: 1px solid rgba(96, 165, 250, 0.6);
+}
+
+.layer-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #1a3060;
+  border: 1.5px solid #60a5fa;
+  border-radius: 1px;
+  z-index: 1;
+}
+
+.layer-handle--resize-tl { top: -4px;    left: -4px;              cursor: nwse-resize; }
+.layer-handle--resize-tr { top: -4px;    right: -4px;             cursor: nesw-resize; }
+.layer-handle--resize-br { bottom: -4px; right: -4px;             cursor: nwse-resize; }
+.layer-handle--resize-bl { bottom: -4px; left: -4px;              cursor: nesw-resize; }
+
+.layer-handle--rotate {
+  top: -28px;
+  left: calc(50% - 4px);
+  border-radius: 50%;
+  cursor: crosshair;
+}
+
+.layer-rotate-line {
+  position: absolute;
+  top: -20px;
+  left: calc(50% - 0.5px);
+  width: 1px;
+  height: 20px;
+  background: rgba(96, 165, 250, 0.4);
+  pointer-events: none;
 }
 
 /* ── Layer panel ─────────────────────────────────────────────────────────── */
