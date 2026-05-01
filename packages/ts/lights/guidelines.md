@@ -159,6 +159,54 @@ Stage mode                         Surface mode
 - In Stage mode: slide-level properties, graph config (module toggles + params), list of surfaces
 - In Surface mode: layer stack, AOI editor (draw region in camera space), reaction bindings
 
+## Projector Output Window
+
+A second Electron `BrowserWindow` that serves as the actual projection — the user drags it onto the projector display (macOS extended desktop) and fullscreens it. No UI chrome: black background, surfaces rendered at their warped positions with real layer content, nothing else.
+
+### Relationship to the editor
+
+The two windows run in separate renderer processes and share no state directly. The editor sends changes to the Electron main process via IPC; the main process forwards the active slide to the output window.
+
+```
+Editor window  ──IPC──▶  Main process  ──IPC──▶  Output window
+ (authoring)               (state hub)             (projection)
+```
+
+### Coordinate system
+
+The output window's canvas **is** the projector coordinate space. `outputPolygon` points (normalised [0,1]) map to the output window's full width × height with no letterboxing or aspect-ratio box — the window fills the display, and the display is the projector.
+
+The Three.js renderer covers NDC [−1, 1] filling the entire window, so the existing homography vertex shader works unchanged. Only the fragment shaders differ: the output window renders actual layer content (solid fill, image, text) instead of the editor's checkerboard placeholder.
+
+### IPC addition
+
+```ts
+// Main → Output window
+type OutputCommand =
+  | { type: 'slide:render'; slide: Slide }
+```
+
+Sent whenever the active slide changes or its surfaces/layers are edited. The output window re-renders immediately on receipt.
+
+### Window lifecycle
+
+1. Created on app launch alongside the editor window — hidden or shown on a secondary display
+2. User positions it on the projector display and fullscreens it (standard macOS window management)
+3. On slide switch: main process sends `slide:render` with the new slide; output window re-renders
+4. Output window has no interaction surface — pointer events ignored, no menu bar
+
+### Build plan
+
+- **M2**: create the output window shell — Electron `BrowserWindow`, basic Three.js renderer, IPC wiring. Renders black (no layers yet). Establishes the multi-window architecture before content exists.
+- **M3**: output window renders real layer content. Solid fill is the first target — immediately makes the projection useful.
+- **M4**: reactions fire in the output window (layer animations, visibility changes driven by ML events).
+
+### Constraints
+
+- Single output window only — one projector. Multi-projector is a non-goal.
+- User positions the window manually — no auto-detect of the projector display.
+- The checkerboard placeholder is editor-only and never sent to the output window.
+
 ## Milestones
 
 ### Milestone 1 — Electron Shell + Live Canvas
@@ -184,20 +232,22 @@ Goal: define surfaces manually and see content warped correctly onto them.
 - Homography GLSL shader applied: anything placed in surface local space warps correctly to stage
 - Surface mode: click a surface to enter its flat local editor; back button returns to stage
 - Slide switch triggers graph lifecycle (diff, drain, stop/start modules)
+- **Projector output window shell**: second `BrowserWindow` created, IPC wiring in place, renders black (no layers yet)
 
-**Done when**: you can define a surface, place a solid color on it, and see it correctly warped in the stage view.
+**Done when**: you can define a surface, place a solid color on it, and see it correctly warped in the stage view. The output window opens alongside the editor.
 
 ### Milestone 3 — Layers, Content & Project
 
-Goal: author real content on surfaces and save the work.
+Goal: author real content on surfaces and see it live on the projector.
 
 - Layer types: solid color, image (file picker), text
 - Drag, resize, rotate layers in surface local space
 - Layer panel (right sidebar): stack, visibility toggles, reorder
 - Graph config panel per slide: toggle modules on/off, expose key params
 - Project save/load via native file dialogs (JSON file)
+- **Output window renders real layers**: solid fill first, then image and text. Edits in the editor appear on the projector in real time.
 
-**Done when**: you can build a multi-surface, multi-slide project with real content, save it, reopen it, and see it projected correctly.
+**Done when**: you can build a multi-surface, multi-slide project with real content, save it, reopen it, and see it projected correctly on the output window.
 
 ### Milestone 4 — Event Reactions
 
