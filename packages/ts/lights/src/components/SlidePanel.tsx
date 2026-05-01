@@ -33,7 +33,17 @@ export default function SlidePanel() {
             >
               <span className="slide-name">{slide.name}</span>
               <button
-                className="icon-btn slide-remove"
+                className="icon-btn slide-action"
+                title="Duplicate slide"
+                onClick={e => {
+                  e.stopPropagation()
+                  dispatch({ type: 'slide:duplicate', slideId: slide.id })
+                }}
+              >
+                ⎘
+              </button>
+              <button
+                className="icon-btn slide-action slide-remove"
                 title="Remove slide"
                 onClick={e => {
                   e.stopPropagation()

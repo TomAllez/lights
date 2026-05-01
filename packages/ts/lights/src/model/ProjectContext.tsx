@@ -24,6 +24,7 @@ const initial: ProjectState = {
 
 export type ProjectAction =
   | { type: 'slide:add' }
+  | { type: 'slide:duplicate'; slideId: string }
   | { type: 'slide:remove'; slideId: string }
   | { type: 'slide:select'; slideId: string | null }
   | { type: 'surface:add'; slideId: string }
@@ -76,6 +77,30 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
         ...state,
         project: { ...project, slides: [...project.slides, slide] },
         selectedSlideId: slide.id,
+        selectedSurfaceId: null,
+        surfaceMode: false,
+      }
+    }
+
+    case 'slide:duplicate': {
+      const src = project.slides.find(s => s.id === action.slideId)
+      if (!src) return state
+      const copy: Slide = {
+        ...src,
+        id: crypto.randomUUID(),
+        name: `${src.name} copy`,
+        surfaces: src.surfaces.map(sf => ({
+          ...sf,
+          id: crypto.randomUUID(),
+          layers: sf.layers.map(l => ({ ...l, id: crypto.randomUUID() })),
+        })),
+      }
+      const idx = project.slides.findIndex(s => s.id === action.slideId)
+      const slides = [...project.slides.slice(0, idx + 1), copy, ...project.slides.slice(idx + 1)]
+      return {
+        ...state,
+        project: { ...project, slides },
+        selectedSlideId: copy.id,
         selectedSurfaceId: null,
         surfaceMode: false,
       }

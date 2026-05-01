@@ -78,14 +78,14 @@ html, body, #root {
   white-space: nowrap;
 }
 
-.slide-remove {
+.slide-action {
   opacity: 0;
-  margin-left: 6px;
+  margin-left: 4px;
   color: #555;
 }
 
-.slide-item:hover .slide-remove,
-.slide-item.selected .slide-remove {
+.slide-item:hover .slide-action,
+.slide-item.selected .slide-action {
   opacity: 1;
 }
 
