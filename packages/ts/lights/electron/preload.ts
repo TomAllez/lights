@@ -8,6 +8,12 @@ const bridge: LightsBridge = {
     ipcRenderer.on('graph:event', listener)
     return () => ipcRenderer.off('graph:event', listener)
   },
+  sendSlide: (slide: unknown) => ipcRenderer.send('output:slide', slide),
+  onOutputRender: (handler: (slide: unknown) => void) => {
+    const listener = (_: Electron.IpcRendererEvent, slide: unknown) => handler(slide)
+    ipcRenderer.on('output:render', listener)
+    return () => ipcRenderer.off('output:render', listener)
+  },
 }
 
 contextBridge.exposeInMainWorld('lights', bridge)
