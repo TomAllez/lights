@@ -8,12 +8,14 @@ export interface ProjectState {
   project: Project
   selectedSlideId: string | null
   selectedSurfaceId: string | null
+  surfaceMode: boolean  // true = flat local editor open
 }
 
 const initial: ProjectState = {
   project: { slides: [], calibration: {} },
   selectedSlideId: null,
   selectedSurfaceId: null,
+  surfaceMode: false,
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -26,6 +28,8 @@ export type ProjectAction =
   | { type: 'surface:update'; slideId: string; surface: Surface }
   | { type: 'surface:remove'; slideId: string; surfaceId: string }
   | { type: 'surface:select'; surfaceId: string | null }
+  | { type: 'surface:enter' }   // double-click → open flat editor
+  | { type: 'surface:exit' }    // back / Escape → return to stage, keep selection
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +49,7 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
         project: { ...project, slides: [...project.slides, slide] },
         selectedSlideId: slide.id,
         selectedSurfaceId: null,
+        surfaceMode: false,
       }
     }
 
@@ -59,11 +64,12 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
         project: { ...project, slides },
         selectedSlideId,
         selectedSurfaceId: null,
+        surfaceMode: false,
       }
     }
 
     case 'slide:select':
-      return { ...state, selectedSlideId: action.slideId, selectedSurfaceId: null }
+      return { ...state, selectedSlideId: action.slideId, selectedSurfaceId: null, surfaceMode: false }
 
     case 'surface:add': {
       const surface: Surface = {
@@ -116,11 +122,19 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
           ),
         },
         selectedSurfaceId,
+        surfaceMode: selectedSurfaceId === null ? false : state.surfaceMode,
       }
     }
 
     case 'surface:select':
-      return { ...state, selectedSurfaceId: action.surfaceId }
+      return { ...state, selectedSurfaceId: action.surfaceId, surfaceMode: false }
+
+    case 'surface:enter':
+      if (!state.selectedSurfaceId) return state
+      return { ...state, surfaceMode: true }
+
+    case 'surface:exit':
+      return { ...state, surfaceMode: false }
   }
 }
 
@@ -136,7 +150,6 @@ const ProjectContext = createContext<ContextValue | null>(null)
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial)
 
-  // Activate the selected slide on the backend whenever it changes
   useEffect(() => {
     if (state.selectedSlideId === null) return
     const slide = state.project.slides.find(s => s.id === state.selectedSlideId)

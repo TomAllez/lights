@@ -9,7 +9,7 @@ import { useProject } from './model/ProjectContext'
 export default function App() {
   const [status, setStatus] = useState<'running' | 'stopped' | 'error'>('stopped')
   const { state } = useProject()
-  const inSurfaceMode = state.selectedSurfaceId !== null
+  const inSurfaceMode = state.surfaceMode
 
   useEffect(() => {
     return window.lights.onEvent((event) => {

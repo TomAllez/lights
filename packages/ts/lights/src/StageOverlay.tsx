@@ -4,18 +4,28 @@ import { useProject } from './model/ProjectContext'
 import type { Surface } from './model/types'
 import type { Point } from './model/types'
 
+// Drag threshold in normalised stage coords (~5 px on an 800 px canvas).
+const DRAG_THRESHOLD = 0.006
+
 type DragState = {
   surfaceId: string
   slideId: string
-  cornerIdx: number
-  polygon: [Point, Point, Point, Point]
+  startPt: Point
+  startPolygon: [Point, Point, Point, Point]
+  livePolygon: [Point, Point, Point, Point]
+  cornerIdx: number | null   // null = body drag (translate all corners)
+  hasMoved: boolean
 } | null
+
+// Double-click detection: track last click per surface, 300 ms window.
+type LastClick = { surfaceId: string; time: number }
 
 export default function StageOverlay() {
   const { state, dispatch } = useProject()
   const svgRef = useRef<SVGSVGElement>(null)
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [drag, setDrag] = useState<DragState>(null)
+  const lastClickRef = useRef<LastClick | null>(null)
 
   useEffect(() => {
     const el = svgRef.current!
@@ -49,39 +59,66 @@ export default function StageOverlay() {
     }
   }
 
-  function onCornerDown(
-    e: ReactPointerEvent<SVGCircleElement>,
+  function startDrag(
+    e: ReactPointerEvent,
     surface: Surface,
     slideId: string,
-    idx: number
+    cornerIdx: number | null
   ) {
-    e.stopPropagation()
     svgRef.current!.setPointerCapture(e.pointerId)
-    setDrag({
-      surfaceId: surface.id,
-      slideId,
-      cornerIdx: idx,
-      polygon: [...surface.outputPolygon] as [Point, Point, Point, Point],
-    })
+    const startPt = toNorm(e.clientX, e.clientY)
+    const startPolygon = [...surface.outputPolygon] as [Point, Point, Point, Point]
+    setDrag({ surfaceId: surface.id, slideId, startPt, startPolygon, livePolygon: startPolygon, cornerIdx, hasMoved: false })
   }
 
   function onPointerMove(e: ReactPointerEvent<SVGSVGElement>) {
     if (!drag) return
     const pt = toNorm(e.clientX, e.clientY)
-    const polygon = drag.polygon.map((p, i) => (i === drag.cornerIdx ? pt : p)) as [Point, Point, Point, Point]
-    setDrag({ ...drag, polygon })
+    const dx = pt.x - drag.startPt.x
+    const dy = pt.y - drag.startPt.y
+    const hasMoved = drag.hasMoved || Math.hypot(dx, dy) > DRAG_THRESHOLD
+
+    let livePolygon: [Point, Point, Point, Point]
+    if (drag.cornerIdx !== null) {
+      livePolygon = drag.startPolygon.map((p, i) => i === drag.cornerIdx ? pt : p) as [Point, Point, Point, Point]
+    } else {
+      livePolygon = drag.startPolygon.map(p => ({
+        x: Math.max(0, Math.min(1, p.x + dx)),
+        y: Math.max(0, Math.min(1, p.y + dy)),
+      })) as [Point, Point, Point, Point]
+    }
+
+    setDrag({ ...drag, livePolygon, hasMoved })
   }
 
   function onPointerUp() {
     if (!drag) return
     const surface = surfaces.find(s => s.id === drag.surfaceId)
-    if (surface) {
-      dispatch({
-        type: 'surface:update',
-        slideId: drag.slideId,
-        surface: { ...surface, outputPolygon: drag.polygon },
-      })
+
+    if (drag.cornerIdx !== null || drag.hasMoved) {
+      if (surface) {
+        dispatch({
+          type: 'surface:update',
+          slideId: drag.slideId,
+          surface: { ...surface, outputPolygon: drag.livePolygon },
+        })
+      }
+    } else {
+      // No movement on body = click. Detect double-click manually to avoid
+      // relying on the dblclick event, which is unreliable when pointer
+      // capture is active on an SVG element.
+      const now = Date.now()
+      const last = lastClickRef.current
+      if (last?.surfaceId === drag.surfaceId && now - last.time < 300) {
+        lastClickRef.current = null
+        dispatch({ type: 'surface:select', surfaceId: drag.surfaceId })
+        dispatch({ type: 'surface:enter' })
+      } else {
+        lastClickRef.current = { surfaceId: drag.surfaceId, time: now }
+        dispatch({ type: 'surface:select', surfaceId: drag.surfaceId })
+      }
     }
+
     setDrag(null)
   }
 
@@ -102,7 +139,7 @@ export default function StageOverlay() {
       onPointerUp={onPointerUp}
     >
       {surfaces.map(surface => {
-        const polygon = drag?.surfaceId === surface.id ? drag.polygon : surface.outputPolygon
+        const polygon = drag?.surfaceId === surface.id ? drag.livePolygon : surface.outputPolygon
         const selected = surface.id === selectedSurfaceId
         const c = px(centroid(polygon))
         const pointsStr = polygon.map(p => { const q = px(p); return `${q.x},${q.y}` }).join(' ')
@@ -114,8 +151,8 @@ export default function StageOverlay() {
               fill={selected ? 'rgba(96,165,250,0.1)' : 'rgba(255,255,255,0.04)'}
               stroke={selected ? '#60a5fa' : '#555'}
               strokeWidth={selected ? 1.5 : 1}
-              style={{ cursor: 'pointer' }}
-              onClick={() => dispatch({ type: 'surface:select', surfaceId: surface.id })}
+              style={{ cursor: drag ? 'grabbing' : 'move' }}
+              onPointerDown={e => startDrag(e, surface, selectedSlideId!, null)}
             />
             <text
               x={c.x}
@@ -140,7 +177,7 @@ export default function StageOverlay() {
                   stroke={selected ? '#60a5fa' : '#555'}
                   strokeWidth={1.5}
                   style={{ cursor: drag ? 'grabbing' : 'grab' }}
-                  onPointerDown={e => onCornerDown(e, surface, selectedSlideId!, idx)}
+                  onPointerDown={e => { e.stopPropagation(); startDrag(e, surface, selectedSlideId!, idx) }}
                 />
               )
             })}
