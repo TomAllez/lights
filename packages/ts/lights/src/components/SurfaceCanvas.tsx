@@ -1,7 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
-import { useProject } from './model/ProjectContext'
-import type { Layer, LayerTransform, Point, SolidLayer } from './model/types'
+import { useProject } from '../model/ProjectContext'
+import type { LayerTransform, Point } from '../model/types'
+import LayerObject from './LayerObject'
+import type { Corner } from './LayerObject'
 
+// ── Drag state ────────────────────────────────────────────────────────────────
+
+type DragKind =
+  | { kind: 'move';   startPx: Point; startT: LayerTransform }
+  | { kind: 'resize'; corner: Corner; startPx: Point; startT: LayerTransform }
+  | { kind: 'rotate'; centerPx: Point; startAngle: number; startRotation: number }
+
+interface ActiveDrag { layerId: string; drag: DragKind; canvasW: number; canvasH: number }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Estimate the aspect ratio of a surface's output polygon by averaging the
+ * widths and heights of opposite edges in stage-normalized coordinates.
+ * Stage aspect ratio (16:9) is applied to compensate for non-square stage pixels.
+ */
 function surfaceAspectRatio(polygon: [Point, Point, Point, Point]): number {
   const stageAr = 16 / 9
   function dist(a: Point, b: Point) {
@@ -14,25 +32,24 @@ function surfaceAspectRatio(polygon: [Point, Point, Point, Point]): number {
   return h > 0 ? w / h : 16 / 9
 }
 
+/** Return the largest (w, h) that fits inside (aw, ah) at aspect ratio ar. */
 function fitContain(aw: number, ah: number, ar: number) {
   return aw / ah > ar
     ? { w: ah * ar, h: ah }
     : { w: aw, h: aw / ar }
 }
 
-// ── Drag state ────────────────────────────────────────────────────────────────
-
-type Corner = 'tl' | 'tr' | 'br' | 'bl'
-
-type DragKind =
-  | { kind: 'move';   startPx: Point; startT: LayerTransform }
-  | { kind: 'resize'; corner: Corner; startPx: Point; startT: LayerTransform }
-  | { kind: 'rotate'; centerPx: Point; startAngle: number; startRotation: number }
-
-interface ActiveDrag { layerId: string; drag: DragKind; canvasW: number; canvasH: number }
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
+/**
+ * Surface-mode editor: a flat 2D canvas scaled to match the surface's aspect
+ * ratio. Each visible layer is rendered as an interactive div that can be:
+ * - Dragged to move
+ * - Corner-dragged to resize (Shift = aspect-lock)
+ * - Rotation-handle-dragged to rotate
+ *
+ * Escape exits back to the stage view.
+ */
 export default function SurfaceCanvas() {
   const { state, dispatch } = useProject()
   const { project, selectedSlideId, selectedSurfaceId, selectedLayerId } = state
@@ -173,58 +190,6 @@ export default function SurfaceCanvas() {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-// ── LayerObject ───────────────────────────────────────────────────────────────
-
-const CORNERS: Corner[] = ['tl', 'tr', 'br', 'bl']
-
-interface LayerObjectProps {
-  layer: Layer
-  canvasW: number
-  canvasH: number
-  isSelected: boolean
-  onMoveStart: (e: React.PointerEvent) => void
-  onResizeStart: (e: React.PointerEvent, corner: Corner) => void
-  onRotateStart: (e: React.PointerEvent) => void
-  onSelect: () => void
-}
-
-function LayerObject({ layer, canvasW, canvasH, isSelected, onMoveStart, onResizeStart, onRotateStart, onSelect }: LayerObjectProps) {
-  const t = layer.transform
-  const color = layer.type === 'solid' ? (layer as SolidLayer).color : 'transparent'
-
-  return (
-    <div
-      className={`layer-object${isSelected ? ' layer-object--selected' : ''}`}
-      style={{
-        left: t.x * canvasW,
-        top: t.y * canvasH,
-        width: t.w * canvasW,
-        height: t.h * canvasH,
-        transform: `translate(-50%, -50%) rotate(${t.rotation}deg)`,
-        background: color,
-      }}
-      onPointerDown={e => { e.stopPropagation(); onSelect(); onMoveStart(e) }}
-    >
-      {isSelected && (
-        <>
-          {CORNERS.map(corner => (
-            <div
-              key={corner}
-              className={`layer-handle layer-handle--resize-${corner}`}
-              onPointerDown={e => { e.stopPropagation(); onResizeStart(e, corner) }}
-            />
-          ))}
-          <div className="layer-rotate-line" />
-          <div
-            className="layer-handle layer-handle--rotate"
-            onPointerDown={e => { e.stopPropagation(); onRotateStart(e) }}
-          />
-        </>
-      )}
     </div>
   )
 }

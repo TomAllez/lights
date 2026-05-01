@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useProject } from './model/ProjectContext'
-import type { Surface } from './model/types'
-import type { Point } from './model/types'
+import { useProject } from '../model/ProjectContext'
+import type { Surface, Point } from '../model/types'
 
 // Drag threshold in normalised stage coords (~5 px on an 800 px canvas).
 const DRAG_THRESHOLD = 0.006
@@ -13,13 +12,26 @@ type DragState = {
   startPt: Point
   startPolygon: [Point, Point, Point, Point]
   livePolygon: [Point, Point, Point, Point]
-  cornerIdx: number | null   // null = body drag (translate all corners)
+  /** null = body drag (translate all corners), number = corner index being dragged */
+  cornerIdx: number | null
   hasMoved: boolean
 } | null
 
-// Double-click detection: track last click per surface, 300 ms window.
+/** Per-surface timestamp for manual double-click detection. */
 type LastClick = { surfaceId: string; time: number }
 
+/**
+ * SVG overlay that renders surface polygons on the stage.
+ *
+ * Supports:
+ * - Single click  → select surface
+ * - Double click  → enter surface-mode editor
+ * - Body drag     → translate all four corners
+ * - Corner drag   → move individual corner (free-form warp)
+ *
+ * Double-click is detected manually (300 ms window) because `dblclick` events
+ * are unreliable when pointer capture is active on an SVG element.
+ */
 export default function StageOverlay() {
   const { state, dispatch } = useProject()
   const svgRef = useRef<SVGSVGElement>(null)
@@ -104,9 +116,6 @@ export default function StageOverlay() {
         })
       }
     } else {
-      // No movement on body = click. Detect double-click manually to avoid
-      // relying on the dblclick event, which is unreliable when pointer
-      // capture is active on an SVG element.
       const now = Date.now()
       const last = lastClickRef.current
       if (last?.surfaceId === drag.surfaceId && now - last.time < 300) {

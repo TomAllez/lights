@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import Canvas from './Canvas'
-import SlidePanel from './SlidePanel'
-import StageOverlay from './StageOverlay'
-import SurfaceCanvas from './SurfaceCanvas'
-import SurfacePanel from './SurfacePanel'
+import Canvas from './components/Canvas'
+import SlidePanel from './components/SlidePanel'
+import StageOverlay from './components/StageOverlay'
+import SurfaceCanvas from './components/SurfaceCanvas'
+import SurfacePanel from './components/SurfacePanel'
 import { useProject } from './model/ProjectContext'
 
 export default function App() {
