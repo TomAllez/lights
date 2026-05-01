@@ -52,7 +52,7 @@ export default function SurfaceCanvas() {
 
   if (!surface || !selectedSlideId) return null
 
-  const solidLayer = surface.layers.find(l => l.type === 'solid')
+  const solidLayer = surface.layers.find(l => l.type === 'solid' && l.visible)
   const fillColor = solidLayer?.type === 'solid' ? solidLayer.color : '#111122'
   const ar = surfaceAspectRatio(surface.outputPolygon)
 

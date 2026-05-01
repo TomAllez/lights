@@ -120,7 +120,7 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
   geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
   geo.setIndex([0, 1, 2, 0, 2, 3])
 
-  const solidLayer = surface.layers.find((l): l is SolidLayer => l.type === 'solid')
+  const solidLayer = surface.layers.find((l): l is SolidLayer => l.type === 'solid' && l.visible)
   const material = solidLayer
     ? new THREE.ShaderMaterial({
         vertexShader,
