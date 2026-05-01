@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { useProject } from './model/ProjectContext'
+import { buildSurfaceMesh, disposeSurfaceMesh } from './homography'
 
 // ── MediaPipe topology ───────────────────────────────────────────────────────
 
@@ -170,11 +172,21 @@ function drawFaces(ctx: CanvasRenderingContext2D, faces: Landmark[][], r: Rect) 
 
 export default function Canvas() {
   const containerRef = useRef<HTMLDivElement>(null)
+  const renderRef = useRef<() => void>(() => {})
+  const surfaceGroupRef = useRef<THREE.Group | null>(null)
 
+  const { state } = useProject()
+  const { project, selectedSlideId } = state
+
+  const surfaces = useMemo(
+    () => project.slides.find(s => s.id === selectedSlideId)?.surfaces ?? [],
+    [project.slides, selectedSlideId]
+  )
+
+  // ── WebGL setup (runs once) ─────────────────────────────────────────────────
   useEffect(() => {
     const container = containerRef.current!
 
-    // WebGL renderer
     const renderer = new THREE.WebGLRenderer({ antialias: false })
     renderer.setPixelRatio(window.devicePixelRatio)
     renderer.setSize(container.clientWidth, container.clientHeight)
@@ -199,7 +211,13 @@ export default function Canvas() {
     const mesh = new THREE.Mesh(geometry, material)
     scene.add(mesh)
 
-    // Detections accumulate between frames, flushed on each frame event
+    const surfaceGroup = new THREE.Group()
+    scene.add(surfaceGroup)
+    surfaceGroupRef.current = surfaceGroup
+
+    const render = () => renderer.render(scene, camera)
+    renderRef.current = render
+
     let pendingHands: Hand[] = []
     let pendingFaces: Landmark[][] = []
 
@@ -211,7 +229,7 @@ export default function Canvas() {
       renderer.setSize(w, h)
       overlay.width = w
       overlay.height = h
-      renderer.render(scene, camera)
+      render()
     }
 
     function ensureTexture(w: number, h: number) {
@@ -241,7 +259,6 @@ export default function Canvas() {
       if (event.type !== 'frame') return
       ensureTexture(event.width, event.height)
 
-      // Copy RGB24 → RGBA32 into the reused buffer
       if (event.data.byteLength === frameW * frameH * 3) {
         const src = new Uint8Array(event.data)
         for (let i = 0; i < frameW * frameH; i++) {
@@ -253,9 +270,8 @@ export default function Canvas() {
         texture.needsUpdate = true
       }
 
-      renderer.render(scene, camera)
+      render()
 
-      // Flush overlay: clear then redraw buffered detections
       const { clientWidth: cw, clientHeight: ch } = container
       ctx.clearRect(0, 0, cw, ch)
       const r = frameRect(cw, ch, frameW, frameH)
@@ -277,6 +293,22 @@ export default function Canvas() {
       container.removeChild(overlay)
     }
   }, [])
+
+  // ── Surface meshes (rebuilt whenever the active slide's surfaces change) ────
+  useEffect(() => {
+    const group = surfaceGroupRef.current
+    if (!group) return
+
+    surfaces.forEach((surface, i) => group.add(buildSurfaceMesh(surface, i)))
+    renderRef.current()
+
+    return () => {
+      group.traverse(child => {
+        if (child instanceof THREE.Mesh) disposeSurfaceMesh(child)
+      })
+      group.clear()
+    }
+  }, [surfaces])
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }} />
 }
