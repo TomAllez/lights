@@ -31,10 +31,7 @@ export default function OutputApp() {
       surfaceGroup.clear();
       await preloadSurfaces(slide.surfaces);
       slide.surfaces.forEach((surface, i) => {
-        // Skip surfaces with no visible layers — checkerboard stays editor-only
-        if (surface.layers.some((l) => l.visible)) {
-          surfaceGroup.add(buildSurfaceMesh(surface, i));
-        }
+        surfaceGroup.add(buildSurfaceMesh(surface, i));
       });
       render();
     }
