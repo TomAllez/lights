@@ -38,6 +38,8 @@ export type GraphEvent =
 export interface LightsBridge {
   sendCommand: (cmd: GraphCommand) => void
   onEvent: (handler: (event: GraphEvent) => void) => () => void
+  sendSlide: (slide: unknown) => void
+  onOutputRender: (handler: (slide: unknown) => void) => () => void
 }
 
 declare global {

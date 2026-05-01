@@ -146,6 +146,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       if (surface.areaOfInterest) aois[surface.id] = surface.areaOfInterest
     }
     window.lights.sendCommand({ type: 'slide:activate', config: slide.graphConfig, aois })
+    window.lights.sendSlide(slide)
   }, [state.selectedSlideId, state.project.slides])
 
   return <ProjectContext.Provider value={{ state, dispatch }}>{children}</ProjectContext.Provider>

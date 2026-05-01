@@ -10,6 +10,8 @@ process.env.APP_ROOT = path.join(__dirname, '..')
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
 
 let win: BrowserWindow | null = null
+let outputWin: BrowserWindow | null = null
+let lastSlide: unknown = null
 let stubInterval: ReturnType<typeof setInterval> | null = null
 
 function emit(event: GraphEvent) {
@@ -62,6 +64,11 @@ function stopStubGraph() {
   emit({ type: 'graph:status', status: 'stopped' })
 }
 
+ipcMain.on('output:slide', (_event, slide: unknown) => {
+  lastSlide = slide
+  outputWin?.webContents.send('output:render', slide)
+})
+
 ipcMain.on('graph:command', (_event, cmd: GraphCommand) => {
   switch (cmd.type) {
     case 'slide:activate':
@@ -72,6 +79,31 @@ ipcMain.on('graph:command', (_event, cmd: GraphCommand) => {
       break
   }
 })
+
+function createOutputWindow() {
+  outputWin = new BrowserWindow({
+    width: 800,
+    height: 450,
+    backgroundColor: '#000000',
+    title: 'Lights — Output',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+    },
+  })
+
+  outputWin.on('closed', () => { outputWin = null })
+
+  outputWin.webContents.on('did-finish-load', () => {
+    if (lastSlide !== null) outputWin?.webContents.send('output:render', lastSlide)
+  })
+
+  if (DEV_SERVER_URL) {
+    outputWin.loadURL(`${DEV_SERVER_URL}?output=1`)
+  } else {
+    outputWin.loadFile(path.join(process.env.APP_ROOT!, 'dist/index.html'), { query: { output: '1' } })
+  }
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -99,7 +131,10 @@ function createWindow() {
   }
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  createWindow()
+  createOutputWindow()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
