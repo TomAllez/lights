@@ -78,6 +78,22 @@ html, body, #root {
   white-space: nowrap;
 }
 
+.slide-item.selected .slide-name {
+  cursor: text;
+}
+
+.rename-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #60a5fa;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  padding: 0;
+}
+
 .slide-action {
   opacity: 0;
   margin-left: 4px;
@@ -199,6 +215,14 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.surface-item.selected .surface-name {
+  cursor: text;
+}
+
+.surface-panel-title {
+  cursor: text;
 }
 
 .surface-remove {

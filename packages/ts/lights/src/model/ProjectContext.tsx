@@ -31,6 +31,8 @@ export type ProjectAction =
   | { type: 'project:saved'; filePath: string }
   | { type: 'project:new' }
   | { type: 'slide:add' }
+  | { type: 'slide:rename'; slideId: string; name: string }
+  | { type: 'surface:rename'; slideId: string; surfaceId: string; name: string }
   | { type: 'slide:duplicate'; slideId: string }
   | { type: 'slide:remove'; slideId: string }
   | { type: 'slide:select'; slideId: string | null }
@@ -316,6 +318,28 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
       return patchSurfaceLayers(state, action.slideId, action.surfaceId, layers =>
         layers.map(l => l.id === action.layerId ? { ...l, visible: !l.visible } : l)
       )
+
+    case 'slide:rename':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, name: action.name } : s),
+        },
+      }
+
+    case 'surface:rename':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId
+              ? { ...s, surfaces: s.surfaces.map(sf => sf.id === action.surfaceId ? { ...sf, name: action.name } : sf) }
+              : s
+          ),
+        },
+      }
 
     default:
       return state

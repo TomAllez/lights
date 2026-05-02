@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useProject } from '../model/ProjectContext'
 import type { SolidLayer, TextLayer } from '../model/types'
 import LayerList from './LayerList'
@@ -12,6 +13,20 @@ import LayerList from './LayerList'
 export default function SurfacePanel() {
   const { state, dispatch } = useProject()
   const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, surfaceMode } = state
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+
+  function startEdit(surfaceId: string, name: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setEditingId(surfaceId)
+    setEditValue(name)
+  }
+
+  function commit(surfaceId: string) {
+    const trimmed = editValue.trim()
+    if (trimmed && selectedSlideId) dispatch({ type: 'surface:rename', slideId: selectedSlideId, surfaceId, name: trimmed })
+    setEditingId(null)
+  }
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surfaces = slide?.surfaces ?? []
@@ -34,7 +49,27 @@ export default function SurfacePanel() {
     return (
       <aside className="surface-panel">
         <div className="surface-panel-header">
-          <span>{surface.name}</span>
+          {editingId === surface.id ? (
+            <input
+              autoFocus
+              className="rename-input"
+              value={editValue}
+              onFocus={e => e.target.select()}
+              onChange={e => setEditValue(e.target.value)}
+              onBlur={() => commit(surface.id)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setEditingId(null)
+              }}
+            />
+          ) : (
+            <span
+              className="surface-panel-title"
+              onClick={e => startEdit(surface.id, surface.name, e)}
+            >
+              {surface.name}
+            </span>
+          )}
         </div>
 
         <LayerList
@@ -114,9 +149,34 @@ export default function SurfacePanel() {
             <div
               key={s.id}
               className={`surface-item${s.id === selectedSurfaceId ? ' selected' : ''}`}
-              onClick={() => dispatch({ type: 'surface:select', surfaceId: s.id })}
+              onClick={() => {
+                if (editingId !== s.id) dispatch({ type: 'surface:select', surfaceId: s.id })
+              }}
             >
-              <span className="surface-name">{s.name}</span>
+              {editingId === s.id ? (
+                <input
+                  autoFocus
+                  className="rename-input"
+                  value={editValue}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={() => commit(s.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') e.currentTarget.blur()
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="surface-name"
+                  onClick={e => {
+                    if (s.id === selectedSurfaceId) startEdit(s.id, s.name, e)
+                  }}
+                >
+                  {s.name}
+                </span>
+              )}
               <button
                 className="icon-btn surface-remove"
                 title="Remove surface"
