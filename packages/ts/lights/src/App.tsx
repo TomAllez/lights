@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { Canvas, SlidePanel, StageOverlay, SurfaceCanvas, SurfacePanel } from './components';
+import { Canvas, LayerToolbar, SlidePanel, StageOverlay, SurfaceCanvas, SurfacePanel } from './components';
 import { useProject } from './model';
 import { GraphStatus } from './ipc/types';
 
@@ -31,6 +31,7 @@ export default function App() {
         )}
         <span className="status">{status}</span>
       </div>
+      <LayerToolbar />
       <SurfacePanel />
     </div>
   );

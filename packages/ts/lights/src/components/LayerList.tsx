@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ImageLayer, Layer, SolidLayer } from '../model/types'
+import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../model/types'
 
 interface LayerListProps {
   surface: { layers: Layer[] }
@@ -8,19 +8,8 @@ interface LayerListProps {
   onToggleVisibility: (id: string) => void
   onRemove: (id: string) => void
   onReorder: (ids: string[]) => void
-  onAdd: () => void
-  onAddImage: () => void
 }
 
-/**
- * Scrollable layer stack panel for surface mode. Supports:
- * - Click to select
- * - Drag-and-drop reordering (HTML5 DnD)
- * - Visibility toggle (●/○)
- * - Color swatch for solid layers / thumbnail for image layers
- * - Per-layer remove button
- * - Add solid layer (+) and add image layer (img) buttons
- */
 export default function LayerList({
   surface,
   selectedLayerId,
@@ -28,8 +17,6 @@ export default function LayerList({
   onToggleVisibility,
   onRemove,
   onReorder,
-  onAdd,
-  onAddImage,
 }: LayerListProps) {
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dropIdx, setDropIdx] = useState<number | null>(null)
@@ -61,14 +48,6 @@ export default function LayerList({
 
   return (
     <div className="layer-panel">
-      <div className="layer-panel-header">
-        <span>Layers</span>
-        <div className="layer-panel-actions">
-          <button className="icon-btn" title="Add solid layer" onClick={onAdd}>+</button>
-          <button className="icon-btn icon-btn--img" title="Add image layer" onClick={onAddImage}>img</button>
-        </div>
-      </div>
-
       {surface.layers.length === 0 ? (
         <p className="panel-empty">No layers</p>
       ) : (
@@ -108,6 +87,9 @@ export default function LayerList({
                   alt=""
                   draggable={false}
                 />
+              )}
+              {layer.type === 'text' && (
+                <span className="layer-text-badge" style={{ color: (layer as TextLayer).color }}>T</span>
               )}
               <button
                 className="icon-btn layer-remove"

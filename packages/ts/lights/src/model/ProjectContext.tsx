@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface } from './types'
+import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer } from './types'
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,7 @@ export type ProjectAction =
   | { type: 'surface:exit' }    // back / Escape → return to stage, keep selection
   | { type: 'layer:add'; slideId: string; surfaceId: string }
   | { type: 'layer:add-image'; slideId: string; surfaceId: string; src: string; name: string }
+  | { type: 'layer:add-text'; slideId: string; surfaceId: string }
   | { type: 'layer:remove'; slideId: string; surfaceId: string; layerId: string }
   | { type: 'layer:update'; slideId: string; surfaceId: string; layer: Layer }
   | { type: 'layer:reorder'; slideId: string; surfaceId: string; layerIds: string[] }
@@ -213,6 +214,26 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
         visible: true,
         color: '#3a6ea5',
         transform: { x: 0.5, y: 0.5, w: 0.8, h: 0.8, rotation: 0 },
+      }
+      return {
+        ...patchSurfaceLayers(state, action.slideId, action.surfaceId, layers => [layer, ...layers]),
+        selectedLayerId: layer.id,
+      }
+    }
+
+    case 'layer:add-text': {
+      const slide = project.slides.find(s => s.id === action.slideId)
+      const surface = slide?.surfaces.find(sf => sf.id === action.surfaceId)
+      if (!surface) return state
+      const layer: TextLayer = {
+        id: crypto.randomUUID(),
+        type: 'text',
+        name: 'Text',
+        visible: true,
+        content: 'Text',
+        fontSize: 48,
+        color: '#ffffff',
+        transform: { x: 0.5, y: 0.5, w: 0.5, h: 0.2, rotation: 0 },
       }
       return {
         ...patchSurfaceLayers(state, action.slideId, action.surfaceId, layers => [layer, ...layers]),

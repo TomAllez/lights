@@ -284,6 +284,21 @@ html, body, #root {
   outline: 1px solid rgba(96, 165, 250, 0.6);
 }
 
+.layer-text-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1.2;
+}
+
 .layer-handle {
   position: absolute;
   width: 8px;
@@ -318,32 +333,49 @@ html, body, #root {
 
 /* ── Layer panel ─────────────────────────────────────────────────────────── */
 
+.layer-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  width: 48px;
+  border-left: 1px solid #1e1e1e;
+  background: #0d0d0d;
+  flex-shrink: 0;
+}
+
+.layer-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: #4a4a4a;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.1s, color 0.1s;
+}
+
+.layer-tool-btn:hover {
+  background: #1e1e1e;
+  color: #d0d0d0;
+}
+
+.layer-tool-btn:active {
+  background: #272727;
+  color: #fff;
+}
+
 .layer-panel {
   display: flex;
   flex-direction: column;
   border-bottom: 1px solid #1a1a1a;
 }
 
-.layer-panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px 6px;
-  font-size: 10px;
-  color: #444;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.layer-panel-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.icon-btn--img {
-  width: 28px;
-  font-size: 9px;
-}
 
 .layer-list {
   overflow-y: auto;
@@ -441,6 +473,13 @@ html, body, #root {
   color: #ef4444 !important;
 }
 
+.layer-text-badge {
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
 /* ── Surface editor (right panel in surface mode) ────────────────────────── */
 
 .surface-editor {
@@ -455,6 +494,30 @@ html, body, #root {
   color: #555;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.surface-editor-textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 3px;
+  color: #ccc;
+  font-size: 12px;
+  padding: 6px 8px;
+  font-family: inherit;
+}
+
+.surface-editor-textarea:focus {
+  outline: none;
+  border-color: #3b5998;
+}
+
+.surface-editor-value {
+  font-size: 10px;
+  color: #555;
+  text-align: right;
 }
 
 .surface-editor-color {

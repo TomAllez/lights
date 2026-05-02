@@ -17,7 +17,9 @@ export interface SolidLayer { id: string; type: 'solid'; name: string; visible: 
 /** Image layer — src is an absolute file path (or data: URL when serialised). */
 export interface ImageLayer { id: string; type: 'image'; name: string; visible: boolean; src: string; transform: LayerTransform }
 
-export type Layer = SolidLayer | ImageLayer
+export interface TextLayer { id: string; type: 'text'; name: string; visible: boolean; content: string; fontSize: number; color: string; transform: LayerTransform }
+
+export type Layer = SolidLayer | ImageLayer | TextLayer
 
 export interface Reaction { id: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

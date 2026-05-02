@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ImageLayer, SolidLayer, Surface } from '../model/types'
+import type { ImageLayer, SolidLayer, Surface, TextLayer } from '../model/types'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +138,21 @@ function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
       if (img) {
         ctx.drawImage(img, -t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
       }
+    } else if (layer.type === 'text') {
+      const tl = layer as TextLayer
+      const scaledSize = tl.fontSize * TEX_SIZE / 500
+      ctx.font = `${scaledSize}px sans-serif`
+      ctx.fillStyle = tl.color
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const boxW = t.w * TEX_SIZE
+      const lines = tl.content.split('\n')
+      const lineH = scaledSize * 1.2
+      const totalH = lines.length * lineH
+      lines.forEach((line, i) => {
+        const y = -totalH / 2 + i * lineH + lineH / 2
+        ctx.fillText(line, 0, y, boxW)
+      })
     }
 
     ctx.restore()

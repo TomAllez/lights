@@ -1,4 +1,4 @@
-import type { ImageLayer, Layer, SolidLayer } from '../model/types'
+import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../model/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -49,6 +49,8 @@ export default function LayerObject({
           }
         : {}
 
+  const textLayer = layer.type === 'text' ? (layer as TextLayer) : null
+
   return (
     <div
       className={`layer-object${isSelected ? ' layer-object--selected' : ''}`}
@@ -62,6 +64,14 @@ export default function LayerObject({
       }}
       onPointerDown={e => { e.stopPropagation(); onSelect(); onMoveStart(e) }}
     >
+      {textLayer && (
+        <div
+          className="layer-text-content"
+          style={{ color: textLayer.color, fontSize: `${textLayer.fontSize * canvasH / 500}px` }}
+        >
+          {textLayer.content}
+        </div>
+      )}
       {isSelected && (
         <>
           {CORNERS.map(corner => (
