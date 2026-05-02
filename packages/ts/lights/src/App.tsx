@@ -1,27 +1,27 @@
-import { useEffect, useState } from 'react'
-import Canvas from './components/Canvas'
-import SlidePanel from './components/SlidePanel'
-import StageOverlay from './components/StageOverlay'
-import SurfaceCanvas from './components/SurfaceCanvas'
-import SurfacePanel from './components/SurfacePanel'
-import { useProject } from './model/ProjectContext'
+import { useEffect, useState } from 'react';
+
+import { Canvas, SlidePanel, StageOverlay, SurfaceCanvas, SurfacePanel } from './components';
+import { useProject } from './model';
+import { GraphStatus } from './ipc/types';
 
 export default function App() {
-  const [status, setStatus] = useState<'running' | 'stopped' | 'error'>('stopped')
-  const { state } = useProject()
-  const inSurfaceMode = state.surfaceMode
+  const [status, setStatus] = useState<GraphStatus>(GraphStatus.Stopped);
+  const {
+    state: { surfaceMode },
+  } = useProject();
 
   useEffect(() => {
     return window.lights.onEvent((event) => {
-      if (event.type === 'graph:status') setStatus(event.status)
-    })
-  }, [])
+      if (event.type === 'graph:status') setStatus(event.status);
+    });
+  }, []);
 
+  // *Claude* : Should slide panel be visible in surface mode ?
   return (
     <div className="app">
       <SlidePanel />
       <div className="stage-area">
-        {inSurfaceMode ? (
+        {surfaceMode ? (
           <SurfaceCanvas />
         ) : (
           <div className="stage-canvas">
@@ -33,5 +33,5 @@ export default function App() {
       </div>
       <SurfacePanel />
     </div>
-  )
+  );
 }

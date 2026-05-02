@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import type { GraphCommand, GraphEvent } from '../src/ipc/types'
+import { GraphStatus } from '../src/ipc/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -45,7 +46,7 @@ function startStubGraph() {
     clearInterval(stubInterval)
     stubInterval = null
   }
-  emit({ type: 'graph:status', status: 'running' })
+  emit({ type: 'graph:status', status: GraphStatus.Running })
   let tick = 0
   stubInterval = setInterval(() => {
     emit({ type: 'frame', width: 320, height: 240, data: new ArrayBuffer(0) })
@@ -62,7 +63,7 @@ function stopStubGraph() {
     clearInterval(stubInterval)
     stubInterval = null
   }
-  emit({ type: 'graph:status', status: 'stopped' })
+  emit({ type: 'graph:status', status: GraphStatus.Stopped })
 }
 
 ipcMain.handle('dialog:pick-image', async () => {

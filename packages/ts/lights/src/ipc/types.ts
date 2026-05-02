@@ -9,6 +9,12 @@ export interface Pattern {
   data: ArrayBuffer
 }
 
+export enum GraphStatus {
+  Running = 'running',
+  Stopped = 'stopped',
+  Error = 'error',
+}
+
 export interface GraphConfig {
   modules: Record<string, { enabled: boolean; params?: Record<string, unknown> }>
 }
@@ -21,6 +27,7 @@ export interface SurfaceGeometry {
   outputPolygon: Point[]
 }
 
+// *Claude* : I think we will need to make a context for useGraph as well ? What do you think ?
 export type GraphCommand =
   | { type: 'calibration:start' }
   | { type: 'calibration:stop' }
@@ -33,7 +40,7 @@ export type GraphEvent =
   | { type: 'calibration:result'; surfaces: SurfaceGeometry[] }
   | { type: 'frame'; width: number; height: number; data: ArrayBuffer }
   | { type: 'detection'; moduleId: string; position: Point; data: ArrayBuffer }
-  | { type: 'graph:status'; status: 'running' | 'stopped' | 'error' }
+  | { type: 'graph:status'; status: GraphStatus }
 
 export interface LightsBridge {
   sendCommand: (cmd: GraphCommand) => void
