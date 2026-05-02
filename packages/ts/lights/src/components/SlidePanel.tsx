@@ -1,12 +1,23 @@
+import { useState } from 'react'
 import { useProject } from '../model/ProjectContext'
 
-/**
- * Left sidebar panel displaying the slide list.
- * Supports adding, removing, and selecting slides.
- */
 export default function SlidePanel() {
   const { state, dispatch } = useProject()
   const { project, selectedSlideId } = state
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+
+  function startEdit(slideId: string, name: string, e: React.MouseEvent) {
+    e.stopPropagation()
+    setEditingId(slideId)
+    setEditValue(name)
+  }
+
+  function commit(slideId: string) {
+    const trimmed = editValue.trim()
+    if (trimmed) dispatch({ type: 'slide:rename', slideId, name: trimmed })
+    setEditingId(null)
+  }
 
   return (
     <aside className="slide-panel">
@@ -29,9 +40,34 @@ export default function SlidePanel() {
             <div
               key={slide.id}
               className={`slide-item${slide.id === selectedSlideId ? ' selected' : ''}`}
-              onClick={() => dispatch({ type: 'slide:select', slideId: slide.id })}
+              onClick={() => {
+                if (editingId !== slide.id) dispatch({ type: 'slide:select', slideId: slide.id })
+              }}
             >
-              <span className="slide-name">{slide.name}</span>
+              {editingId === slide.id ? (
+                <input
+                  autoFocus
+                  className="rename-input"
+                  value={editValue}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setEditValue(e.target.value)}
+                  onBlur={() => commit(slide.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') e.currentTarget.blur()
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <span
+                  className="slide-name"
+                  onClick={e => {
+                    if (slide.id === selectedSlideId) startEdit(slide.id, slide.name, e)
+                  }}
+                >
+                  {slide.name}
+                </span>
+              )}
               <button
                 className="icon-btn slide-action"
                 title="Duplicate slide"
