@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -15,6 +15,8 @@ let win: BrowserWindow | null = null
 let outputWin: BrowserWindow | null = null
 let lastSlide: unknown = null
 let stubInterval: ReturnType<typeof setInterval> | null = null
+let currentFilePath: string | null = null
+let isDirty = false
 
 function emit(event: GraphEvent) {
   win?.webContents.send('graph:event', event)
@@ -85,6 +87,117 @@ ipcMain.handle('dialog:pick-image', async () => {
   return { name: path.basename(filePath), src: `data:${mime};base64,${data.toString('base64')}` }
 })
 
+function winTitle() {
+  const base = currentFilePath ? path.basename(currentFilePath) : 'Untitled'
+  return isDirty ? `Lights — ${base} •` : `Lights — ${base}`
+}
+
+ipcMain.handle('project:save', async (_event, { project }: { project: unknown }) => {
+  let filePath = currentFilePath
+  if (!filePath) {
+    const result = await dialog.showSaveDialog(win!, {
+      defaultPath: 'project.lights.json',
+      filters: [{ name: 'Lights Project', extensions: ['json'] }],
+    })
+    if (result.canceled || !result.filePath) return null
+    filePath = result.filePath
+  }
+  await fs.writeFile(filePath, JSON.stringify(project, null, 2), 'utf-8')
+  currentFilePath = filePath
+  isDirty = false
+  win?.setTitle(winTitle())
+  return { filePath }
+})
+
+ipcMain.handle('project:save-as', async (_event, { project }: { project: unknown }) => {
+  const result = await dialog.showSaveDialog(win!, {
+    defaultPath: currentFilePath ? path.basename(currentFilePath) : 'project.lights.json',
+    filters: [{ name: 'Lights Project', extensions: ['json'] }],
+  })
+  if (result.canceled || !result.filePath) return null
+  const filePath = result.filePath
+  await fs.writeFile(filePath, JSON.stringify(project, null, 2), 'utf-8')
+  currentFilePath = filePath
+  isDirty = false
+  win?.setTitle(winTitle())
+  return { filePath }
+})
+
+ipcMain.on('project:set-dirty', (_event, dirty: boolean) => {
+  isDirty = dirty
+  win?.setTitle(winTitle())
+})
+
+ipcMain.on('project:quit-confirmed', () => {
+  isDirty = false
+  win?.destroy()
+})
+
+function buildMenu() {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    { role: 'appMenu' },
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => {
+            currentFilePath = null
+            isDirty = false
+            win?.setTitle('Lights')
+            win?.webContents.send('menu:new')
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Open…',
+          accelerator: 'CmdOrCtrl+O',
+          click: async () => {
+            const result = await dialog.showOpenDialog(win!, {
+              filters: [{ name: 'Lights Project', extensions: ['json'] }],
+              properties: ['openFile'],
+            })
+            if (result.canceled || result.filePaths.length === 0) return
+            const filePath = result.filePaths[0]
+            try {
+              const data = await fs.readFile(filePath, 'utf-8')
+              const project = JSON.parse(data)
+              currentFilePath = filePath
+              isDirty = false
+              win?.setTitle(winTitle())
+              win?.webContents.send('project:opened', { project, filePath })
+            } catch {
+              await dialog.showMessageBox(win!, {
+                type: 'error',
+                message: 'Could not open project',
+                detail: `Failed to read ${path.basename(filePath)}.`,
+              })
+            }
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'Save',
+          accelerator: 'CmdOrCtrl+S',
+          click: () => win?.webContents.send('menu:save'),
+        },
+        {
+          label: 'Save As…',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => win?.webContents.send('menu:save-as'),
+        },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
 ipcMain.on('output:slide', (_event, slide: unknown) => {
   lastSlide = slide
   outputWin?.webContents.send('output:render', slide)
@@ -139,6 +252,26 @@ function createWindow() {
     },
   })
 
+  win.on('close', (e) => {
+    if (!isDirty) return
+    e.preventDefault()
+    dialog.showMessageBox(win!, {
+      type: 'question',
+      buttons: ['Save', "Don't Save", 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+      message: 'Save changes to your project?',
+      detail: 'Your changes will be lost if you don\'t save them.',
+    }).then(({ response }) => {
+      if (response === 0) {
+        win?.webContents.send('menu:save-and-quit')
+      } else if (response === 1) {
+        isDirty = false
+        win?.destroy()
+      }
+    })
+  })
+
   win.on('closed', () => {
     win = null
     stopStubGraph()
@@ -153,6 +286,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  buildMenu()
   createWindow()
   createOutputWindow()
 })

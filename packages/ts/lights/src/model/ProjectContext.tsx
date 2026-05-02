@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useReducer } from 'react'
+import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
 import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer } from './types'
 
@@ -10,6 +10,8 @@ export interface ProjectState {
   selectedSurfaceId: string | null
   selectedLayerId: string | null
   surfaceMode: boolean  // true = flat local editor open
+  isDirty: boolean
+  currentFilePath: string | null
 }
 
 const initial: ProjectState = {
@@ -18,11 +20,16 @@ const initial: ProjectState = {
   selectedSurfaceId: null,
   selectedLayerId: null,
   surfaceMode: false,
+  isDirty: false,
+  currentFilePath: null,
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
 
 export type ProjectAction =
+  | { type: 'project:load'; project: Project; filePath: string }
+  | { type: 'project:saved'; filePath: string }
+  | { type: 'project:new' }
   | { type: 'slide:add' }
   | { type: 'slide:duplicate'; slideId: string }
   | { type: 'slide:remove'; slideId: string }
@@ -65,6 +72,28 @@ function patchSurfaceLayers(
 }
 
 function reducer(state: ProjectState, action: ProjectAction): ProjectState {
+  // Project-level actions that manage dirty/path themselves
+  if (action.type === 'project:load') {
+    return {
+      ...initial,
+      project: action.project,
+      currentFilePath: action.filePath,
+      selectedSlideId: action.project.slides[0]?.id ?? null,
+    }
+  }
+  if (action.type === 'project:saved') {
+    return { ...state, isDirty: false, currentFilePath: action.filePath }
+  }
+  if (action.type === 'project:new') {
+    return { ...initial }
+  }
+
+  const next = projectMutationReducer(state, action)
+  // Auto-mark dirty whenever the project object reference changes
+  return next.project !== state.project ? { ...next, isDirty: true } : next
+}
+
+function projectMutationReducer(state: ProjectState, action: ProjectAction): ProjectState {
   const { project } = state
 
   switch (action.type) {
@@ -287,6 +316,9 @@ function reducer(state: ProjectState, action: ProjectAction): ProjectState {
       return patchSurfaceLayers(state, action.slideId, action.surfaceId, layers =>
         layers.map(l => l.id === action.layerId ? { ...l, visible: !l.visible } : l)
       )
+
+    default:
+      return state
   }
 }
 
@@ -301,6 +333,8 @@ const ProjectContext = createContext<ContextValue | null>(null)
 
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial)
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   useEffect(() => {
     if (state.selectedSlideId === null) return
@@ -313,6 +347,45 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     window.lights.sendCommand({ type: 'slide:activate', config: slide.graphConfig, aois })
     window.lights.sendSlide(slide)
   }, [state.selectedSlideId, state.project.slides])
+
+  // Notify main of dirty state for close confirmation
+  useEffect(() => {
+    window.lights.notifyDirty(state.isDirty)
+  }, [state.isDirty])
+
+  // Wire up File menu events from the main process
+  useEffect(() => {
+    const save = async () => {
+      const result = await window.lights.saveProject(stateRef.current.project)
+      if (result) dispatch({ type: 'project:saved', filePath: result.filePath })
+    }
+
+    const offSave = window.lights.onMenuSave(save)
+
+    const offSaveAs = window.lights.onMenuSaveAs(async () => {
+      const result = await window.lights.saveProjectAs(stateRef.current.project)
+      if (result) dispatch({ type: 'project:saved', filePath: result.filePath })
+    })
+
+    const offSaveAndQuit = window.lights.onMenuSaveAndQuit(async () => {
+      const result = await window.lights.saveProject(stateRef.current.project)
+      if (result) {
+        dispatch({ type: 'project:saved', filePath: result.filePath })
+        window.lights.confirmQuit()
+      }
+    })
+
+    const offOpened = window.lights.onProjectOpened(({ project, filePath }) => {
+      dispatch({ type: 'project:load', project: project as Project, filePath })
+    })
+
+    const offNew = window.lights.onMenuNew(() => {
+      if (stateRef.current.isDirty && !window.confirm('Discard unsaved changes?')) return
+      dispatch({ type: 'project:new' })
+    })
+
+    return () => { offSave(); offSaveAs(); offSaveAndQuit(); offOpened(); offNew() }
+  }, [])
 
   return <ProjectContext.Provider value={{ state, dispatch }}>{children}</ProjectContext.Provider>
 }
