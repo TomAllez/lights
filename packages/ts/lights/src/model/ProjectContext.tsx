@@ -51,6 +51,7 @@ export type ProjectAction =
   | { type: 'layer:reorder'; slideId: string; surfaceId: string; layerIds: string[] }
   | { type: 'layer:select'; layerId: string | null }
   | { type: 'layer:toggle-visibility'; slideId: string; surfaceId: string; layerId: string }
+  | { type: 'slide:updateGraphConfig'; slideId: string; config: import('../ipc/types').GraphConfig }
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -318,6 +319,15 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
       return patchSurfaceLayers(state, action.slideId, action.surfaceId, layers =>
         layers.map(l => l.id === action.layerId ? { ...l, visible: !l.visible } : l)
       )
+
+    case 'slide:updateGraphConfig':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, graphConfig: action.config } : s),
+        },
+      }
 
     case 'slide:rename':
       return {

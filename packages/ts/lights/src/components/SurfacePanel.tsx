@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useProject } from '../model/ProjectContext'
 import type { SolidLayer, TextLayer } from '../model/types'
 import LayerList from './LayerList'
+import GraphConfigPanel from './GraphConfigPanel'
 
 /**
  * Right sidebar that switches between two modes:
@@ -191,6 +192,8 @@ export default function SurfacePanel() {
           ))}
         </div>
       )}
+
+      <GraphConfigPanel />
     </aside>
   )
 }
