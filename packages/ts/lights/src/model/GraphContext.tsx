@@ -1,10 +1,9 @@
-import { createContext, useContext, useEffect, useRef } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Subject } from 'rxjs'
 import { GraphStatus } from '../ipc/types'
 import type { GraphEvent } from '../ipc/types'
 import { useProject } from './ProjectContext'
-import { useState } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -47,21 +46,27 @@ export function GraphProvider({ children }: { children: ReactNode }) {
     })
   }, [detection$])
 
-  // Send slide:activate when the selected slide changes, graph:stop when none.
+  // Serialise graphConfig of the active slide. The graph restarts only when
+  // the slide changes or a module is toggled/retuned — not on geometry edits.
+  const graphConfigKey = useMemo(() => {
+    if (!selectedSlideId) return null
+    const slide = project.slides.find(s => s.id === selectedSlideId)
+    return slide ? JSON.stringify(slide.graphConfig) : null
+  }, [selectedSlideId, project.slides])
+
   useEffect(() => {
-    if (selectedSlideId === null) {
+    if (selectedSlideId === null || graphConfigKey === null) {
       window.lights.sendCommand({ type: 'graph:stop' })
       return
     }
     const slide = project.slides.find(s => s.id === selectedSlideId)
     if (!slide) return
-
     const aois: Record<string, { x: number; y: number }[]> = {}
     for (const surface of slide.surfaces) {
       if (surface.areaOfInterest) aois[surface.id] = surface.areaOfInterest
     }
     window.lights.sendCommand({ type: 'slide:activate', config: slide.graphConfig, aois })
-  }, [selectedSlideId, project.slides])
+  }, [selectedSlideId, graphConfigKey])
 
   return (
     <GraphContext.Provider value={{ status, stopGraph, detection$ }}>
