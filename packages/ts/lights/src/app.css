@@ -683,6 +683,32 @@ html, body, #root {
   text-align: right;
 }
 
+/* ── Canvas video toggle ─────────────────────────────────────────────────── */
+
+.canvas-video-toggle {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 8px;
+  line-height: 1;
+}
+
+.canvas-video-toggle:hover {
+  border-color: #555;
+  color: #ccc;
+}
+
+.canvas-video-toggle.off {
+  color: #60a5fa;
+  border-color: #3b5998;
+}
+
 /* ── Status pill ─────────────────────────────────────────────────────────── */
 
 .status {

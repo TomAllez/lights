@@ -2,8 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { GraphCommand, GraphEvent } from '../src/ipc/types'
-import { GraphStatus } from '../src/ipc/types'
+import { registerGraphHandlers } from './graph'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -14,59 +13,8 @@ const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
 let win: BrowserWindow | null = null
 let outputWin: BrowserWindow | null = null
 let lastSlide: unknown = null
-let stubInterval: ReturnType<typeof setInterval> | null = null
 let currentFilePath: string | null = null
 let isDirty = false
-
-function emit(event: GraphEvent) {
-  win?.webContents.send('graph:event', event)
-}
-
-// Encodes a static right-hand pose for overlay testing (1 byte handedness + 21×12 bytes)
-function mockHandpose(): ArrayBuffer {
-  const buf = new ArrayBuffer(1 + 21 * 12)
-  const view = new DataView(buf)
-  new Uint8Array(buf)[0] = 1 // Right
-  const lm = [
-    [0.50, 0.70], [0.45, 0.62], [0.40, 0.55], [0.35, 0.50], [0.30, 0.45],
-    [0.47, 0.55], [0.45, 0.45], [0.44, 0.37], [0.43, 0.30],
-    [0.50, 0.54], [0.50, 0.44], [0.50, 0.36], [0.50, 0.28],
-    [0.53, 0.55], [0.54, 0.45], [0.54, 0.37], [0.55, 0.30],
-    [0.57, 0.57], [0.59, 0.49], [0.60, 0.43], [0.61, 0.38],
-  ]
-  for (let i = 0; i < 21; i++) {
-    const off = 1 + i * 12
-    view.setFloat32(off,     lm[i][0], true)
-    view.setFloat32(off + 4, lm[i][1], true)
-    view.setFloat32(off + 8, 0,        true)
-  }
-  return buf
-}
-
-function startStubGraph() {
-  if (stubInterval !== null) {
-    clearInterval(stubInterval)
-    stubInterval = null
-  }
-  emit({ type: 'graph:status', status: GraphStatus.Running })
-  let tick = 0
-  stubInterval = setInterval(() => {
-    emit({ type: 'frame', width: 320, height: 240, data: new ArrayBuffer(0) })
-    // Emit a mock hand every 10 frames so the overlay can be tested visually
-    if (tick % 10 === 0) {
-      emit({ type: 'detection', moduleId: 'HandPoseEstimation', position: { x: 0.5, y: 0.5 }, data: mockHandpose() })
-    }
-    tick++
-  }, 33)
-}
-
-function stopStubGraph() {
-  if (stubInterval !== null) {
-    clearInterval(stubInterval)
-    stubInterval = null
-  }
-  emit({ type: 'graph:status', status: GraphStatus.Stopped })
-}
 
 ipcMain.handle('dialog:pick-image', async () => {
   const result = await dialog.showOpenDialog(win!, {
@@ -203,17 +151,6 @@ ipcMain.on('output:slide', (_event, slide: unknown) => {
   outputWin?.webContents.send('output:render', slide)
 })
 
-ipcMain.on('graph:command', (_event, cmd: GraphCommand) => {
-  switch (cmd.type) {
-    case 'slide:activate':
-      startStubGraph()
-      break
-    case 'graph:stop':
-      stopStubGraph()
-      break
-  }
-})
-
 function createOutputWindow() {
   outputWin = new BrowserWindow({
     width: 800,
@@ -274,7 +211,6 @@ function createWindow() {
 
   win.on('closed', () => {
     win = null
-    stopStubGraph()
   })
 
   if (DEV_SERVER_URL) {
@@ -289,6 +225,7 @@ app.whenReady().then(() => {
   buildMenu()
   createWindow()
   createOutputWindow()
+  registerGraphHandlers(win!)
 })
 
 app.on('window-all-closed', () => {

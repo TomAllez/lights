@@ -374,11 +374,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     if (state.selectedSlideId === null) return
     const slide = state.project.slides.find(s => s.id === state.selectedSlideId)
     if (!slide) return
-    const aois: Record<string, { x: number; y: number }[]> = {}
-    for (const surface of slide.surfaces) {
-      if (surface.areaOfInterest) aois[surface.id] = surface.areaOfInterest
-    }
-    window.lights.sendCommand({ type: 'slide:activate', config: slide.graphConfig, aois })
     window.lights.sendSlide(slide)
   }, [state.selectedSlideId, state.project.slides])
 
