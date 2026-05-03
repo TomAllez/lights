@@ -114,11 +114,18 @@ export default function Canvas() {
 
       if (event.data.byteLength === frameW * frameH * 3) {
         const src = new Uint8Array(event.data);
-        for (let i = 0; i < frameW * frameH; i++) {
-          frameBuffer[i * 4] = src[i * 3];
-          frameBuffer[i * 4 + 1] = src[i * 3 + 1];
-          frameBuffer[i * 4 + 2] = src[i * 3 + 2];
-          frameBuffer[i * 4 + 3] = 255;
+        // FFmpeg outputs rows top-to-bottom; WebGL DataTexture expects
+        // bottom-to-top. Flip rows during the RGB→RGBA copy.
+        for (let row = 0; row < frameH; row++) {
+          const srcRow = frameH - 1 - row;
+          for (let col = 0; col < frameW; col++) {
+            const dst = (row * frameW + col) * 4;
+            const s   = (srcRow * frameW + col) * 3;
+            frameBuffer[dst]     = src[s];
+            frameBuffer[dst + 1] = src[s + 1];
+            frameBuffer[dst + 2] = src[s + 2];
+            frameBuffer[dst + 3] = 255;
+          }
         }
         texture.needsUpdate = true;
       }
