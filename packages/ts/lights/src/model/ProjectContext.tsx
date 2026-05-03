@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer } from './types'
+import type { ImageLayer, Layer, Paver, PaverDimensions, Project, Slide, Surface, TextLayer, Volume } from './types'
+import { defaultPaverCorners } from './paver'
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,7 @@ export interface ProjectState {
   selectedSlideId: string | null
   selectedSurfaceId: string | null
   selectedLayerId: string | null
+  selectedVolumeId: string | null
   surfaceMode: boolean  // true = flat local editor open
   isDirty: boolean
   currentFilePath: string | null
@@ -19,6 +21,7 @@ const initial: ProjectState = {
   selectedSlideId: null,
   selectedSurfaceId: null,
   selectedLayerId: null,
+  selectedVolumeId: null,
   surfaceMode: false,
   isDirty: false,
   currentFilePath: null,
@@ -52,6 +55,15 @@ export type ProjectAction =
   | { type: 'layer:select'; layerId: string | null }
   | { type: 'layer:toggle-visibility'; slideId: string; surfaceId: string; layerId: string }
   | { type: 'slide:updateGraphConfig'; slideId: string; config: import('../ipc/types').GraphConfig }
+  | { type: 'volume:add'; slideId: string; dimensions?: PaverDimensions }
+  | { type: 'volume:remove'; slideId: string; volumeId: string }
+  | { type: 'volume:select'; volumeId: string | null }
+  | { type: 'volume:updateCorner'; slideId: string; volumeId: string; cornerIdx: number; point: import('../ipc/types').Point }
+  | { type: 'volume:updateDimensions'; slideId: string; volumeId: string; dimensions: PaverDimensions }
+  | { type: 'volume:rename'; slideId: string; volumeId: string; name: string }
+  | { type: 'volume:addCube'; slideId: string; volumeId: string; position: [number,number,number] }
+  | { type: 'volume:moveCube'; slideId: string; volumeId: string; cubeId: string; position: [number,number,number] }
+  | { type: 'volume:removeCube'; slideId: string; volumeId: string; cubeId: string }
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -74,14 +86,37 @@ function patchSurfaceLayers(
   }
 }
 
+function patchVolume(
+  state: ProjectState,
+  slideId: string,
+  volumeId: string,
+  fn: (v: Volume) => Volume
+): ProjectState {
+  return {
+    ...state,
+    project: {
+      ...state.project,
+      slides: state.project.slides.map(s =>
+        s.id === slideId
+          ? { ...s, volumes: s.volumes.map(v => v.id === volumeId ? fn(v) : v) }
+          : s
+      ),
+    },
+  }
+}
+
 function reducer(state: ProjectState, action: ProjectAction): ProjectState {
   // Project-level actions that manage dirty/path themselves
   if (action.type === 'project:load') {
+    const project: Project = {
+      ...action.project,
+      slides: action.project.slides.map(s => ({ ...s, volumes: s.volumes ?? [] })),
+    }
     return {
       ...initial,
-      project: action.project,
+      project,
       currentFilePath: action.filePath,
-      selectedSlideId: action.project.slides[0]?.id ?? null,
+      selectedSlideId: project.slides[0]?.id ?? null,
     }
   }
   if (action.type === 'project:saved') {
@@ -105,6 +140,7 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
         id: crypto.randomUUID(),
         name: `Slide ${project.slides.length + 1}`,
         surfaces: [],
+        volumes: [],
         graphConfig: { modules: {} },
       }
       return {
@@ -127,6 +163,11 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
           ...sf,
           id: crypto.randomUUID(),
           layers: sf.layers.map(l => ({ ...l, id: crypto.randomUUID() })),
+        })),
+        volumes: (src.volumes ?? []).map(v => ({
+          ...v,
+          id: crypto.randomUUID(),
+          cubes: (v as Paver).cubes.map(c => ({ ...c, id: crypto.randomUUID() })),
         })),
       }
       const idx = project.slides.findIndex(s => s.id === action.slideId)
@@ -156,7 +197,7 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
     }
 
     case 'slide:select':
-      return { ...state, selectedSlideId: action.slideId, selectedSurfaceId: null, selectedLayerId: null, surfaceMode: false }
+      return { ...state, selectedSlideId: action.slideId, selectedSurfaceId: null, selectedLayerId: null, selectedVolumeId: null, surfaceMode: false }
 
     case 'surface:add': {
       const surface: Surface = {
@@ -226,7 +267,7 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
     }
 
     case 'surface:select':
-      return { ...state, selectedSurfaceId: action.surfaceId, selectedLayerId: null, surfaceMode: false }
+      return { ...state, selectedSurfaceId: action.surfaceId, selectedLayerId: null, selectedVolumeId: null, surfaceMode: false }
 
     case 'surface:enter':
       if (!state.selectedSurfaceId) return state
@@ -328,6 +369,89 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
           slides: project.slides.map(s => s.id === action.slideId ? { ...s, graphConfig: action.config } : s),
         },
       }
+
+    case 'volume:add': {
+      const slide = project.slides.find(s => s.id === action.slideId)
+      if (!slide) return state
+      const dim: PaverDimensions = action.dimensions ?? { width: 1, height: 1, depth: 1 }
+      const paver: Paver = {
+        id: crypto.randomUUID(),
+        name: `Paver ${(slide.volumes?.length ?? 0) + 1}`,
+        kind: 'paver',
+        dimensions: dim,
+        stageCorners: defaultPaverCorners(dim),
+        cubes: [],
+      }
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId ? { ...s, volumes: [...(s.volumes ?? []), paver] } : s
+          ),
+        },
+        selectedVolumeId: paver.id,
+        selectedSurfaceId: null,
+      }
+    }
+
+    case 'volume:remove': {
+      const selectedVolumeId =
+        state.selectedVolumeId === action.volumeId ? null : state.selectedVolumeId
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId
+              ? { ...s, volumes: (s.volumes ?? []).filter(v => v.id !== action.volumeId) }
+              : s
+          ),
+        },
+        selectedVolumeId,
+      }
+    }
+
+    case 'volume:select':
+      return { ...state, selectedVolumeId: action.volumeId, selectedSurfaceId: null, surfaceMode: false }
+
+    case 'volume:updateCorner':
+      return patchVolume(state, action.slideId, action.volumeId, v => {
+        const paver = v as Paver
+        const corners = [...paver.stageCorners] as typeof paver.stageCorners
+        corners[action.cornerIdx] = action.point
+        return { ...paver, stageCorners: corners }
+      })
+
+    case 'volume:updateDimensions':
+      return patchVolume(state, action.slideId, action.volumeId, v => ({
+        ...(v as Paver),
+        dimensions: action.dimensions,
+      }))
+
+    case 'volume:rename':
+      return patchVolume(state, action.slideId, action.volumeId, v => ({
+        ...v,
+        name: action.name,
+      }))
+
+    case 'volume:addCube':
+      return patchVolume(state, action.slideId, action.volumeId, v => {
+        const paver = v as Paver
+        return { ...paver, cubes: [...paver.cubes, { id: crypto.randomUUID(), position: action.position }] }
+      })
+
+    case 'volume:moveCube':
+      return patchVolume(state, action.slideId, action.volumeId, v => {
+        const paver = v as Paver
+        return { ...paver, cubes: paver.cubes.map(c => c.id === action.cubeId ? { ...c, position: action.position } : c) }
+      })
+
+    case 'volume:removeCube':
+      return patchVolume(state, action.slideId, action.volumeId, v => {
+        const paver = v as Paver
+        return { ...paver, cubes: paver.cubes.filter(c => c.id !== action.cubeId) }
+      })
 
     case 'slide:rename':
       return {

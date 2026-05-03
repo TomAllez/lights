@@ -720,3 +720,109 @@ html, body, #root {
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+/* ── Paver panel ─────────────────────────────────────────────────────────── */
+
+.paver-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.paver-cubes-section {
+  padding: 8px 12px 4px;
+}
+
+.paver-cubes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 4px;
+}
+
+.paver-cube-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.paver-cube-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: #1e1e1e;
+}
+
+.paver-cube-label {
+  color: #aaa;
+}
+
+.paver-editor-btn-row {
+  padding: 8px 12px;
+}
+
+.paver-open-editor-btn {
+  width: 100%;
+  padding: 6px 0;
+  background: #1e3a5f;
+  border: 1px solid #2d5a8e;
+  border-radius: 4px;
+  color: #93c5fd;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.paver-open-editor-btn:hover {
+  background: #2d5a8e;
+}
+
+.surface-editor-input {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 3px;
+  color: #ccc;
+  font-size: 12px;
+  padding: 3px 6px;
+  margin-bottom: 4px;
+  box-sizing: border-box;
+}
+
+/* ── Paver editor overlay ────────────────────────────────────────────────── */
+
+.paver-editor-overlay {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 420px;
+  background: #111;
+  border-left: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.paver-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #2a2a2a;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.paver-editor-title {
+  color: #fbbf24;
+}
+
+.paver-editor-canvas {
+  flex: 1;
+  min-height: 0;
+}

@@ -4,6 +4,34 @@ export type { Point, GraphConfig }
 
 export type Polygon = Point[]
 
+// ── Volume types ─────────────────────────────────────────────────────────────
+
+export interface PaverDimensions {
+  width: number   // X, arbitrary units
+  height: number  // Y
+  depth: number   // Z
+}
+
+// 0-3: front face (z = -depth/2) TL→TR→BR→BL
+// 4-7: back face  (z = +depth/2) TL→TR→BR→BL
+export type PaverCorners = [Point, Point, Point, Point, Point, Point, Point, Point]
+
+export interface PaverCube {
+  id: string
+  position: [number, number, number]
+}
+
+export interface Paver {
+  id: string
+  name: string
+  kind: 'paver'
+  dimensions: PaverDimensions
+  stageCorners: PaverCorners
+  cubes: PaverCube[]
+}
+
+export type Volume = Paver
+
 export interface LayerTransform {
   x: number        // center, normalized [0,1]
   y: number        // center, normalized [0,1]
@@ -38,6 +66,7 @@ export interface Slide {
   id: string
   name: string
   surfaces: Surface[]
+  volumes: Volume[]
   graphConfig: GraphConfig
 }
 

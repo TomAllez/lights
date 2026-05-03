@@ -11,6 +11,9 @@ import {
   frameRect,
 } from './canvas/landmarks';
 import { preloadSurfaces } from '../shaders/homography';
+import { buildPaverRenderState, renderPaver } from '../shaders/paver';
+import type { PaverRenderState } from '../shaders/paver';
+import type { Paver } from '../model/types';
 
 /**
  * Main stage canvas: renders the live camera frame as a WebGL texture, overlays
@@ -21,6 +24,8 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
+  const paverGroupRef = useRef<THREE.Group | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
 
   const showVideoRef = useRef(showVideo);
   showVideoRef.current = showVideo;
@@ -33,6 +38,11 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     [project.slides, selectedSlideId],
   );
 
+  const volumes = useMemo(
+    () => project.slides.find((s) => s.id === selectedSlideId)?.volumes ?? [],
+    [project.slides, selectedSlideId],
+  );
+
   // ── WebGL setup (runs once) ───────────────────────────────────────────────
   useEffect(() => {
     const container = containerRef.current!;
@@ -41,6 +51,7 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
     // 2D overlay for landmarks — appended after WebGL canvas so it sits on top
     const overlay = document.createElement('canvas');
@@ -64,6 +75,10 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     const surfaceGroup = new THREE.Group();
     scene.add(surfaceGroup);
     surfaceGroupRef.current = surfaceGroup;
+
+    const paverGroup = new THREE.Group();
+    scene.add(paverGroup);
+    paverGroupRef.current = paverGroup;
 
     const render = () => {
       mesh.visible = showVideoRef.current;
@@ -165,6 +180,7 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
       material.dispose();
       texture.dispose();
       renderer.dispose();
+      rendererRef.current = null;
       container.removeChild(renderer.domElement);
       container.removeChild(overlay);
     };
@@ -193,6 +209,48 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
       group.clear();
     };
   }, [surfaces]);
+
+  // ── Paver render targets (rebuilt when volumes change) ────────────────────
+  useEffect(() => {
+    const group = paverGroupRef.current;
+    const renderer = rendererRef.current;
+    if (!group || !renderer) return;
+
+    const container = containerRef.current!;
+    const stageW = container.clientWidth;
+    const stageH = container.clientHeight;
+
+    const states = new Map<string, PaverRenderState>();
+    const planes: THREE.Mesh[] = [];
+
+    // Build a full-screen quad per paver that samples the render target
+    const screenGeo = new THREE.PlaneGeometry(2, 2);
+    const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    for (const volume of volumes as Paver[]) {
+      const ps = buildPaverRenderState(volume, stageW, stageH);
+      states.set(volume.id, ps);
+      renderPaver(volume, ps, renderer);
+
+      const mat = new THREE.MeshBasicMaterial({
+        map: ps.target.texture,
+        transparent: true,
+        depthTest: false,
+      });
+      const plane = new THREE.Mesh(screenGeo, mat);
+      group.add(plane);
+      planes.push(plane);
+    }
+
+    renderRef.current();
+
+    return () => {
+      states.forEach(ps => ps.dispose());
+      planes.forEach(p => (p.material as THREE.Material).dispose());
+      group.clear();
+      screenGeo.dispose();
+    };
+  }, [volumes]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }} />;
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useProject } from '../model/ProjectContext'
 import type { Surface, Point } from '../model/types'
+import PaverStageHandles from './PaverStageHandles'
 
 // Session-only surface clipboard — not persisted in project state.
 let surfaceClipboard: Surface | null = null
@@ -101,6 +102,7 @@ export default function StageOverlay() {
   const { project, selectedSlideId, selectedSurfaceId } = state
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surfaces = slide?.surfaces ?? []
+  const volumes = slide?.volumes ?? []
 
   // ── Arrow key nudge ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -246,6 +248,14 @@ export default function StageOverlay() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
+      {volumes.map(volume => (
+        <PaverStageHandles
+          key={volume.id}
+          paver={volume}
+          slideId={selectedSlideId!}
+          svgRef={svgRef}
+        />
+      ))}
       {surfaces.map(surface => {
         const polygon = drag?.surfaceId === surface.id ? drag.livePolygon : surface.outputPolygon
         const selected = surface.id === selectedSurfaceId

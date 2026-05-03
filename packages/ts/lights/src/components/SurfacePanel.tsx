@@ -13,7 +13,7 @@ import GraphConfigPanel from './GraphConfigPanel'
  */
 export default function SurfacePanel() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, surfaceMode } = state
+  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, surfaceMode, selectedVolumeId } = state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 
@@ -31,6 +31,7 @@ export default function SurfacePanel() {
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surfaces = slide?.surfaces ?? []
+  const volumes = slide?.volumes ?? []
   const surface = surfaces.find(s => s.id === selectedSurfaceId)
 
   // ── Surface mode: layer panel ─────────────────────────────────────────────
@@ -184,6 +185,43 @@ export default function SurfacePanel() {
                 onClick={e => {
                   e.stopPropagation()
                   dispatch({ type: 'surface:remove', slideId: selectedSlideId!, surfaceId: s.id })
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="surface-panel-header" style={{ marginTop: 8 }}>
+        <span>Volumes</span>
+        {selectedSlideId && (
+          <button
+            className="icon-btn"
+            title="Add paver"
+            onClick={() => dispatch({ type: 'volume:add', slideId: selectedSlideId })}
+          >
+            +
+          </button>
+        )}
+      </div>
+
+      {selectedSlideId && volumes.length > 0 && (
+        <div className="surface-list">
+          {volumes.map(v => (
+            <div
+              key={v.id}
+              className={`surface-item${v.id === selectedVolumeId ? ' selected' : ''}`}
+              onClick={() => dispatch({ type: 'volume:select', volumeId: v.id })}
+            >
+              <span className="surface-name">{v.name}</span>
+              <button
+                className="icon-btn surface-remove"
+                title="Remove volume"
+                onClick={e => {
+                  e.stopPropagation()
+                  dispatch({ type: 'volume:remove', slideId: selectedSlideId!, volumeId: v.id })
                 }}
               >
                 ×
