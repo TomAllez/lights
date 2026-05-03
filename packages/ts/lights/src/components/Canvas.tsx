@@ -72,8 +72,14 @@ export default function Canvas() {
     };
     renderRef.current = render;
 
-    let pendingHands: Hand[] = [];
-    let pendingFaces: Landmark[][] = [];
+    // Last confirmed detections — redrawn on every frame so landmarks persist
+    // across frames where the Python module was busy (exhaustMap dropped them).
+    let lastHands: Hand[] = [];
+    let lastFaces: Landmark[][] = [];
+    let handsExpiry: ReturnType<typeof setTimeout> | null = null;
+    let facesExpiry: ReturnType<typeof setTimeout> | null = null;
+
+    const LANDMARK_TTL = 300;
 
     function updateLayout() {
       const { clientWidth: w, clientHeight: h } = container;
@@ -100,13 +106,26 @@ export default function Canvas() {
 
     updateLayout();
 
+    function drawOverlay() {
+      const { clientWidth: cw, clientHeight: ch } = container;
+      ctx.clearRect(0, 0, cw, ch);
+      const r = frameRect(cw, ch, frameW, frameH);
+      if (lastHands.length > 0) drawHands(ctx, lastHands, r);
+      if (lastFaces.length > 0) drawFaces(ctx, lastFaces, r);
+    }
+
     const off = window.lights.onEvent((event) => {
       if (event.type === 'detection') {
         if (event.moduleId === 'handpose' && event.data.byteLength >= 1 + 21 * 12) {
-          pendingHands.push(decodeHandpose(event.data));
+          lastHands = [decodeHandpose(event.data)];
+          if (handsExpiry) clearTimeout(handsExpiry);
+          handsExpiry = setTimeout(() => { lastHands = []; drawOverlay(); }, LANDMARK_TTL);
         } else if (event.moduleId === 'facemesh' && event.data.byteLength >= 468 * 12) {
-          pendingFaces.push(decodeFacemesh(event.data));
+          lastFaces = [decodeFacemesh(event.data)];
+          if (facesExpiry) clearTimeout(facesExpiry);
+          facesExpiry = setTimeout(() => { lastFaces = []; drawOverlay(); }, LANDMARK_TTL);
         }
+        drawOverlay();
         return;
       }
 
@@ -132,18 +151,7 @@ export default function Canvas() {
       }
 
       render();
-
-      const { clientWidth: cw, clientHeight: ch } = container;
-      ctx.clearRect(0, 0, cw, ch);
-      const r = frameRect(cw, ch, frameW, frameH);
-      if (pendingHands.length > 0) {
-        drawHands(ctx, pendingHands, r);
-        pendingHands = [];
-      }
-      if (pendingFaces.length > 0) {
-        drawFaces(ctx, pendingFaces, r);
-        pendingFaces = [];
-      }
+      drawOverlay();
     });
 
     const observer = new ResizeObserver(updateLayout);
@@ -152,6 +160,8 @@ export default function Canvas() {
     return () => {
       off();
       observer.disconnect();
+      if (handsExpiry) clearTimeout(handsExpiry);
+      if (facesExpiry) clearTimeout(facesExpiry);
       geometry.dispose();
       material.dispose();
       texture.dispose();
