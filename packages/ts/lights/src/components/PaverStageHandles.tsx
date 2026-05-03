@@ -28,6 +28,17 @@ export default function PaverStageHandles({ paver, slideId, svgRef }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 })
   const [drag, setDrag] = useState<DragState>(null)
 
+  // Keep a ref so imperative handlers always see the latest drag without
+  // being recreated on every state change (stale closure prevention).
+  const dragRef = useRef<DragState>(null)
+  dragRef.current = drag
+
+  // Keep stable refs to props used in imperative handlers
+  const paverRef = useRef(paver)
+  paverRef.current = paver
+  const slideIdRef = useRef(slideId)
+  slideIdRef.current = slideId
+
   useEffect(() => {
     const svg = svgRef.current
     if (!svg) return
@@ -37,6 +48,56 @@ export default function PaverStageHandles({ paver, slideId, svgRef }: Props) {
     obs.observe(svg)
     return () => obs.disconnect()
   }, [svgRef])
+
+  // Attach pointermove / pointerup directly on the SVG so they fire even when
+  // the pointer moves fast outside the <g> element. The SVG owns the pointer
+  // capture (set in onCornerDown), so these always receive events during a drag.
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+
+    function toNorm(clientX: number, clientY: number): Point {
+      const rect = svg!.getBoundingClientRect()
+      return {
+        x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
+        y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
+      }
+    }
+
+    function onMove(e: PointerEvent) {
+      const d = dragRef.current
+      if (!d) return
+      const pt = toNorm(e.clientX, e.clientY)
+      const livePt: Point = {
+        x: Math.max(0, Math.min(1, d.startCorner.x + pt.x - d.startPt.x)),
+        y: Math.max(0, Math.min(1, d.startCorner.y + pt.y - d.startPt.y)),
+      }
+      const next = { ...d, livePt }
+      dragRef.current = next
+      setDrag(next)
+    }
+
+    function onUp() {
+      const d = dragRef.current
+      if (!d) return
+      dispatch({
+        type: 'volume:updateCorner',
+        slideId: slideIdRef.current,
+        volumeId: paverRef.current.id,
+        cornerIdx: d.cornerIdx,
+        point: d.livePt,
+      })
+      dragRef.current = null
+      setDrag(null)
+    }
+
+    svg.addEventListener('pointermove', onMove)
+    svg.addEventListener('pointerup', onUp)
+    return () => {
+      svg.removeEventListener('pointermove', onMove)
+      svg.removeEventListener('pointerup', onUp)
+    }
+  }, [svgRef, dispatch])
 
   function toNorm(clientX: number, clientY: number): Point {
     const rect = svgRef.current!.getBoundingClientRect()
@@ -52,34 +113,14 @@ export default function PaverStageHandles({ paver, slideId, svgRef }: Props) {
 
   function onCornerDown(e: ReactPointerEvent, idx: number) {
     e.stopPropagation()
+    // Capture on the SVG so pointermove/pointerup fire on it even when the
+    // pointer moves outside any child element.
     svgRef.current!.setPointerCapture(e.pointerId)
     if (!selected) dispatch({ type: 'volume:select', volumeId: paver.id })
     const startPt = toNorm(e.clientX, e.clientY)
-    setDrag({ cornerIdx: idx, startPt, startCorner: paver.stageCorners[idx], livePt: paver.stageCorners[idx] })
-  }
-
-  function onPointerMove(e: ReactPointerEvent<SVGSVGElement>) {
-    if (!drag) return
-    const pt = toNorm(e.clientX, e.clientY)
-    const dx = pt.x - drag.startPt.x
-    const dy = pt.y - drag.startPt.y
-    const livePt: Point = {
-      x: Math.max(0, Math.min(1, drag.startCorner.x + dx)),
-      y: Math.max(0, Math.min(1, drag.startCorner.y + dy)),
-    }
-    setDrag({ ...drag, livePt })
-  }
-
-  function onPointerUp() {
-    if (!drag) return
-    dispatch({
-      type: 'volume:updateCorner',
-      slideId,
-      volumeId: paver.id,
-      cornerIdx: drag.cornerIdx,
-      point: drag.livePt,
-    })
-    setDrag(null)
+    const next: DragState = { cornerIdx: idx, startPt, startCorner: paver.stageCorners[idx], livePt: paver.stageCorners[idx] }
+    dragRef.current = next
+    setDrag(next)
   }
 
   function onBodyDown(e: ReactPointerEvent) {
@@ -97,10 +138,7 @@ export default function PaverStageHandles({ paver, slideId, svgRef }: Props) {
   const frontPts = corners.slice(0, 4).map(p => { const q = toPx(p); return `${q.x},${q.y}` }).join(' ')
 
   return (
-    <g
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-    >
+    <g>
       {/* Body hit target (front face polygon) */}
       <polygon
         points={frontPts}
@@ -137,7 +175,7 @@ export default function PaverStageHandles({ paver, slideId, svgRef }: Props) {
             fill={selected ? (isFront ? '#fbbf24' : '#92400e') : '#3a3a3a'}
             stroke={selected ? '#fff' : '#666'}
             strokeWidth={1.5}
-            style={{ cursor: 'grab' }}
+            style={{ cursor: drag ? 'grabbing' : 'grab' }}
             onPointerDown={e => onCornerDown(e, idx)}
           />
         )
