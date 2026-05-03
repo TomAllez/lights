@@ -198,7 +198,12 @@ export default function Canvas() {
       <button
         className={`canvas-video-toggle${showVideo ? '' : ' off'}`}
         title={showVideo ? 'Hide video' : 'Show video'}
-        onClick={() => { setShowVideo(v => !v); renderRef.current(); }}
+        onClick={() => {
+          const next = !showVideoRef.current;
+          showVideoRef.current = next;
+          setShowVideo(next);
+          renderRef.current();
+        }}
       >
         {showVideo ? '⏹' : '▶'}
       </button>
