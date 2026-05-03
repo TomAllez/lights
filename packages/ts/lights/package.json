@@ -18,6 +18,12 @@
   "dependencies": {
     "react": "*",
     "react-dom": "*",
-    "three": "^0.184.0"
+    "three": "^0.184.0",
+    "@lights/graph": "*",
+    "@lights/driver-ffmpeg": "*",
+    "@lights/python-module": "*",
+    "@lights/renderer": "*",
+    "@lights/io": "*",
+    "rxjs": "*"
   }
 }

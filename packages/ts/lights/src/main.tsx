@@ -4,6 +4,7 @@ import './app.css'
 import App from './App'
 import OutputApp from './OutputApp'
 import { ProjectProvider } from './model/ProjectContext'
+import { GraphProvider } from './model/GraphContext'
 
 const isOutput = new URLSearchParams(window.location.search).has('output')
 
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
       <OutputApp />
     ) : (
       <ProjectProvider>
-        <App />
+        <GraphProvider>
+          <App />
+        </GraphProvider>
       </ProjectProvider>
     )}
   </StrictMode>

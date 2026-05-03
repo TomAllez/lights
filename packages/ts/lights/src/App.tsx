@@ -1,20 +1,11 @@
-import { useEffect, useState } from 'react';
-
 import { Canvas, LayerToolbar, SlidePanel, StageOverlay, SurfaceCanvas, SurfacePanel } from './components';
-import { useProject } from './model';
-import { GraphStatus } from './ipc/types';
+import { useProject, useGraph } from './model';
 
 export default function App() {
-  const [status, setStatus] = useState<GraphStatus>(GraphStatus.Stopped);
+  const { status } = useGraph();
   const {
     state: { surfaceMode },
   } = useProject();
-
-  useEffect(() => {
-    return window.lights.onEvent((event) => {
-      if (event.type === 'graph:status') setStatus(event.status);
-    });
-  }, []);
 
   // *Claude* : Should slide panel be visible in surface mode ?
   return (
