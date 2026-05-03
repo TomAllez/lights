@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProject } from '../model/ProjectContext';
 import { buildSurfaceMesh, disposeSurfaceMesh } from '../shaders/homography';
@@ -17,12 +17,11 @@ import { preloadSurfaces } from '../shaders/homography';
  * the active slide's surface homography meshes, and draws MediaPipe landmark
  * skeletons on a transparent 2D canvas sitting above the WebGL layer.
  */
-export default function Canvas() {
+export default function Canvas({ showVideo }: { showVideo: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
 
-  const [showVideo, setShowVideo] = useState(true);
   const showVideoRef = useRef(showVideo);
   showVideoRef.current = showVideo;
 
@@ -171,6 +170,9 @@ export default function Canvas() {
     };
   }, []);
 
+  // Re-render when showVideo toggles so the mesh visibility updates immediately.
+  useEffect(() => { renderRef.current(); }, [showVideo]);
+
   // ── Surface meshes (rebuilt whenever the active slide's surfaces change) ──
   useEffect(() => {
     const group = surfaceGroupRef.current;
@@ -192,21 +194,5 @@ export default function Canvas() {
     };
   }, [surfaces]);
 
-  return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      <button
-        className={`canvas-video-toggle${showVideo ? '' : ' off'}`}
-        title={showVideo ? 'Hide video' : 'Show video'}
-        onClick={() => {
-          const next = !showVideoRef.current;
-          showVideoRef.current = next;
-          setShowVideo(next);
-          renderRef.current();
-        }}
-      >
-        {showVideo ? '⏹' : '▶'}
-      </button>
-    </div>
-  );
+  return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }} />;
 }
