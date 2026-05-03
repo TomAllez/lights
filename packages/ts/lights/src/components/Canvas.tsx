@@ -95,15 +95,9 @@ export default function Canvas() {
 
     const off = window.lights.onEvent((event) => {
       if (event.type === 'detection') {
-        if (
-          event.moduleId === 'HandPoseEstimation' &&
-          event.data.byteLength >= 1 + 21 * 12
-        ) {
+        if (event.moduleId === 'handpose' && event.data.byteLength >= 1 + 21 * 12) {
           pendingHands.push(decodeHandpose(event.data));
-        } else if (
-          event.moduleId === 'FaceMesh' &&
-          event.data.byteLength >= 468 * 12
-        ) {
+        } else if (event.moduleId === 'facemesh' && event.data.byteLength >= 468 * 12) {
           pendingFaces.push(decodeFacemesh(event.data));
         }
         return;
