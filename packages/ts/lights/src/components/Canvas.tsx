@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useProject } from '../model/ProjectContext';
 import { buildSurfaceMesh, disposeSurfaceMesh } from '../shaders/homography';
@@ -21,6 +21,10 @@ export default function Canvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
+
+  const [showVideo, setShowVideo] = useState(true);
+  const showVideoRef = useRef(showVideo);
+  showVideoRef.current = showVideo;
 
   const { state } = useProject();
   const { project, selectedSlideId } = state;
@@ -62,7 +66,10 @@ export default function Canvas() {
     scene.add(surfaceGroup);
     surfaceGroupRef.current = surfaceGroup;
 
-    const render = () => renderer.render(scene, camera);
+    const render = () => {
+      mesh.visible = showVideoRef.current;
+      renderer.render(scene, camera);
+    };
     renderRef.current = render;
 
     let pendingHands: Hand[] = [];
@@ -176,9 +183,15 @@ export default function Canvas() {
   }, [surfaces]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', height: '100%', position: 'relative' }}
-    />
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      <button
+        className={`canvas-video-toggle${showVideo ? '' : ' off'}`}
+        title={showVideo ? 'Hide video' : 'Show video'}
+        onClick={() => { setShowVideo(v => !v); renderRef.current(); }}
+      >
+        {showVideo ? '⏹' : '▶'}
+      </button>
+    </div>
   );
 }
