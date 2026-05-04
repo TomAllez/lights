@@ -7,13 +7,14 @@ import {
   StageOverlay,
   SurfaceCanvas,
   SurfacePanel,
+  VolumeAlignHUD,
 } from './components';
 import { useGraph, useProject } from './model';
 
 export default function App() {
   const { status } = useGraph();
   const {
-    state: { surfaceMode },
+    state: { surfaceMode, volumeAlignMode },
   } = useProject();
   const [showVideo, setShowVideo] = useState(true);
 
@@ -27,7 +28,7 @@ export default function App() {
         ) : (
           <div className="stage-canvas">
             <Canvas showVideo={showVideo} />
-            <StageOverlay />
+            {volumeAlignMode ? <VolumeAlignHUD /> : <StageOverlay />}
           </div>
         )}
         {!surfaceMode && (

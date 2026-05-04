@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume } from './types'
+import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera } from './types'
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -9,7 +9,8 @@ export interface ProjectState {
   selectedSlideId: string | null
   selectedSurfaceId: string | null
   selectedLayerId: string | null
-  surfaceMode: boolean  // true = flat local editor open
+  surfaceMode: boolean      // true = flat local editor open
+  volumeAlignMode: boolean  // true = camera alignment HUD active
   isDirty: boolean
   currentFilePath: string | null
 }
@@ -20,6 +21,7 @@ const initial: ProjectState = {
   selectedSurfaceId: null,
   selectedLayerId: null,
   surfaceMode: false,
+  volumeAlignMode: false,
   isDirty: false,
   currentFilePath: null,
 }
@@ -54,6 +56,9 @@ export type ProjectAction =
   | { type: 'slide:updateGraphConfig'; slideId: string; config: import('../ipc/types').GraphConfig }
   | { type: 'volume:add'; slideId: string }
   | { type: 'volume:remove'; slideId: string }
+  | { type: 'volume:alignStart' }
+  | { type: 'volume:alignDone' }
+  | { type: 'volume:updateCamera'; slideId: string; camera: VolumeCamera }
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -328,6 +333,25 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
         project: {
           ...project,
           slides: project.slides.map(s => s.id === action.slideId ? { ...s, graphConfig: action.config } : s),
+        },
+      }
+
+    case 'volume:alignStart':
+      return { ...state, volumeAlignMode: true, surfaceMode: false }
+
+    case 'volume:alignDone':
+      return { ...state, volumeAlignMode: false }
+
+    case 'volume:updateCamera':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId && s.volume
+              ? { ...s, volume: { ...s.volume, camera: action.camera } }
+              : s
+          ),
         },
       }
 
