@@ -92,6 +92,7 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
       renderer.autoClear = true;
       renderer.render(scene, camera);
       renderer.autoClear = false;
+      renderer.clearDepth();
       renderer.render(volumeScene, volumeCamera);
     };
     renderRef.current = render;

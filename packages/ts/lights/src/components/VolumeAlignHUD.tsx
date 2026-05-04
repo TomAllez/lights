@@ -3,6 +3,36 @@ import * as THREE from 'three'
 import { useProject } from '../model/ProjectContext'
 import type { VolumeCamera } from '../model/types'
 
+// ── Repeat button ─────────────────────────────────────────────────────────────
+
+function RepeatButton({
+  action, children, style,
+}: { action: () => void; children: React.ReactNode; style?: React.CSSProperties }) {
+  const actionRef = useRef(action)
+  actionRef.current = action
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+
+  function start() {
+    actionRef.current()
+    timerRef.current = setTimeout(() => {
+      intervalRef.current = setInterval(() => actionRef.current(), 80)
+    }, 400)
+  }
+
+  function stop() {
+    clearTimeout(timerRef.current)
+    clearInterval(intervalRef.current)
+  }
+
+  return (
+    <button className="icon-btn" style={style} onPointerDown={start} onPointerUp={stop} onPointerLeave={stop}>
+      {children}
+    </button>
+  )
+}
+
 // ── Camera math ───────────────────────────────────────────────────────────────
 
 type V3 = { x: number; y: number; z: number }
@@ -99,10 +129,10 @@ function computeGrid(cam: VolumeCamera, w: number, h: number) {
 
 // ── Step sizes ────────────────────────────────────────────────────────────────
 
-const ORBIT_DEG = 3
-const PAN_UNIT  = 0.1
-const DOLLY_UNIT = 0.2
-const FOV_DEG   = 2
+const ORBIT_DEG  = 0.5
+const PAN_UNIT   = 0.02
+const DOLLY_UNIT = 0.05
+const FOV_DEG    = 0.5
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -124,6 +154,37 @@ export default function VolumeAlignHUD() {
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const volume = slide?.volume
+
+  // Always-current ref so keyboard handler never captures stale camera
+  const nudgeRef = useRef<((fn: (cam: VolumeCamera) => VolumeCamera) => void) | null>(null)
+
+  if (volume && selectedSlideId) {
+    nudgeRef.current = (fn) =>
+      dispatch({ type: 'volume:updateCamera', slideId: selectedSlideId, camera: fn(volume.camera) })
+  }
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!nudgeRef.current) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      const nudge = nudgeRef.current
+      switch (e.key) {
+        case 'ArrowUp':    e.preventDefault(); nudge(e.shiftKey ? c => panCamera(c, 0, +PAN_UNIT)  : c => orbitV(c, -ORBIT_DEG)); break
+        case 'ArrowDown':  e.preventDefault(); nudge(e.shiftKey ? c => panCamera(c, 0, -PAN_UNIT)  : c => orbitV(c, +ORBIT_DEG)); break
+        case 'ArrowLeft':  e.preventDefault(); nudge(e.shiftKey ? c => panCamera(c, -PAN_UNIT, 0)  : c => orbitH(c, -ORBIT_DEG)); break
+        case 'ArrowRight': e.preventDefault(); nudge(e.shiftKey ? c => panCamera(c, +PAN_UNIT, 0)  : c => orbitH(c, +ORBIT_DEG)); break
+        case '+': case '=': nudge(c => dolly(c, +DOLLY_UNIT)); break
+        case '-': case '_': nudge(c => dolly(c, -DOLLY_UNIT)); break
+        case ',': nudge(c => adjustFov(c, -FOV_DEG)); break
+        case '.': nudge(c => adjustFov(c, +FOV_DEG)); break
+        case 'Escape': dispatch({ type: 'volume:alignDone' }); break
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [dispatch])
+
   if (!volume || !selectedSlideId) return null
 
   function nudge(fn: (cam: VolumeCamera) => VolumeCamera) {
@@ -153,43 +214,43 @@ export default function VolumeAlignHUD() {
       {/* Camera controls */}
       <div className="volume-align-controls">
         <div className="volume-align-group">
-          <span className="volume-align-label">Orbit</span>
+          <span className="volume-align-label">Orbit <kbd>↑↓←→</kbd></span>
           <div className="volume-align-dpad">
-            <button className="icon-btn" style={{ gridArea: 'u' }} onClick={() => nudge(c => orbitV(c, -ORBIT_DEG))}>↑</button>
-            <button className="icon-btn" style={{ gridArea: 'l' }} onClick={() => nudge(c => orbitH(c, -ORBIT_DEG))}>←</button>
-            <button className="icon-btn" style={{ gridArea: 'r' }} onClick={() => nudge(c => orbitH(c, +ORBIT_DEG))}>→</button>
-            <button className="icon-btn" style={{ gridArea: 'd' }} onClick={() => nudge(c => orbitV(c, +ORBIT_DEG))}>↓</button>
+            <RepeatButton style={{ gridArea: 'u' }} action={() => nudge(c => orbitV(c, -ORBIT_DEG))}>↑</RepeatButton>
+            <RepeatButton style={{ gridArea: 'l' }} action={() => nudge(c => orbitH(c, -ORBIT_DEG))}>←</RepeatButton>
+            <RepeatButton style={{ gridArea: 'r' }} action={() => nudge(c => orbitH(c, +ORBIT_DEG))}>→</RepeatButton>
+            <RepeatButton style={{ gridArea: 'd' }} action={() => nudge(c => orbitV(c, +ORBIT_DEG))}>↓</RepeatButton>
           </div>
         </div>
 
         <div className="volume-align-group">
-          <span className="volume-align-label">Pan</span>
+          <span className="volume-align-label">Pan <kbd>⇧↑↓←→</kbd></span>
           <div className="volume-align-dpad">
-            <button className="icon-btn" style={{ gridArea: 'u' }} onClick={() => nudge(c => panCamera(c, 0, +PAN_UNIT))}>↑</button>
-            <button className="icon-btn" style={{ gridArea: 'l' }} onClick={() => nudge(c => panCamera(c, -PAN_UNIT, 0))}>←</button>
-            <button className="icon-btn" style={{ gridArea: 'r' }} onClick={() => nudge(c => panCamera(c, +PAN_UNIT, 0))}>→</button>
-            <button className="icon-btn" style={{ gridArea: 'd' }} onClick={() => nudge(c => panCamera(c, 0, -PAN_UNIT))}>↓</button>
+            <RepeatButton style={{ gridArea: 'u' }} action={() => nudge(c => panCamera(c, 0, +PAN_UNIT))}>↑</RepeatButton>
+            <RepeatButton style={{ gridArea: 'l' }} action={() => nudge(c => panCamera(c, -PAN_UNIT, 0))}>←</RepeatButton>
+            <RepeatButton style={{ gridArea: 'r' }} action={() => nudge(c => panCamera(c, +PAN_UNIT, 0))}>→</RepeatButton>
+            <RepeatButton style={{ gridArea: 'd' }} action={() => nudge(c => panCamera(c, 0, -PAN_UNIT))}>↓</RepeatButton>
           </div>
         </div>
 
         <div className="volume-align-group">
-          <span className="volume-align-label">Dolly</span>
+          <span className="volume-align-label">Dolly <kbd>+</kbd><kbd>-</kbd></span>
           <div className="volume-align-pair">
-            <button className="icon-btn" onClick={() => nudge(c => dolly(c, +DOLLY_UNIT))}>+</button>
-            <button className="icon-btn" onClick={() => nudge(c => dolly(c, -DOLLY_UNIT))}>−</button>
+            <RepeatButton action={() => nudge(c => dolly(c, +DOLLY_UNIT))}>+</RepeatButton>
+            <RepeatButton action={() => nudge(c => dolly(c, -DOLLY_UNIT))}>−</RepeatButton>
           </div>
         </div>
 
         <div className="volume-align-group">
-          <span className="volume-align-label">FOV</span>
+          <span className="volume-align-label">FOV <kbd>,</kbd><kbd>.</kbd></span>
           <div className="volume-align-pair">
-            <button className="icon-btn" onClick={() => nudge(c => adjustFov(c, +FOV_DEG))}>+</button>
-            <button className="icon-btn" onClick={() => nudge(c => adjustFov(c, -FOV_DEG))}>−</button>
+            <RepeatButton action={() => nudge(c => adjustFov(c, +FOV_DEG))}>+</RepeatButton>
+            <RepeatButton action={() => nudge(c => adjustFov(c, -FOV_DEG))}>−</RepeatButton>
           </div>
         </div>
 
         <button className="volume-align-done" onClick={() => dispatch({ type: 'volume:alignDone' })}>
-          Done
+          Done <kbd>Esc</kbd>
         </button>
       </div>
     </div>
