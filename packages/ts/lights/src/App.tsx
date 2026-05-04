@@ -1,10 +1,20 @@
+import { Play, Square } from 'lucide-react';
 import { useState } from 'react';
-import { Canvas, LayerToolbar, SlidePanel, StageOverlay, SurfaceCanvas, SurfacePanel } from './components';
-import { useProject, useGraph } from './model';
+import {
+  Canvas,
+  LayerToolbar,
+  SlidePanel,
+  StageOverlay,
+  SurfaceCanvas,
+  SurfacePanel,
+} from './components';
+import { useGraph, useProject } from './model';
 
 export default function App() {
   const { status } = useGraph();
-  const { state: { surfaceMode } } = useProject();
+  const {
+    state: { surfaceMode },
+  } = useProject();
   const [showVideo, setShowVideo] = useState(true);
 
   // *Claude* : Should slide panel be visible in surface mode ?
@@ -20,13 +30,19 @@ export default function App() {
             <StageOverlay />
           </div>
         )}
-        <button
-          className={`canvas-video-toggle${showVideo ? '' : ' off'}`}
-          title={showVideo ? 'Hide video' : 'Show video'}
-          onClick={() => setShowVideo(v => !v)}
-        >
-          {showVideo ? '⏹' : '▶'}
-        </button>
+        {!surfaceMode && (
+          <button
+            className={`canvas-video-toggle${showVideo ? '' : ' off'}`}
+            title={showVideo ? 'Hide video' : 'Show video'}
+            onClick={() => setShowVideo((v) => !v)}
+          >
+            {showVideo ? (
+              <Square size={12} fill="currentColor" />
+            ) : (
+              <Play size={12} fill="currentColor" />
+            )}
+          </button>
+        )}
         <span className="status">{status}</span>
       </div>
       <LayerToolbar />
