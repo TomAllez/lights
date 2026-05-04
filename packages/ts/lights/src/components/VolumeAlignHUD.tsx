@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
 import { useProject } from '../model/ProjectContext'
 import type { VolumeCamera } from '../model/types'
 
@@ -57,6 +58,45 @@ function adjustFov(cam: VolumeCamera, delta: number): VolumeCamera {
   return { ...cam, fov: Math.max(10, Math.min(120, cam.fov + delta)) }
 }
 
+// ── Grid projection ───────────────────────────────────────────────────────────
+
+// Project a finite floor grid (y = 0) through the camera.
+// Finite points react to ALL camera changes: orbit, pan, dolly, and FOV.
+// Lines naturally converge toward the two vanishing points, giving the
+// two-point perspective visual while also reflecting position/zoom changes.
+function computeGrid(cam: VolumeCamera, w: number, h: number) {
+  const camera = new THREE.PerspectiveCamera(cam.fov, w / h, 0.1, 1e6)
+  camera.position.set(cam.position.x, cam.position.y, cam.position.z)
+  camera.lookAt(cam.target.x, cam.target.y, cam.target.z)
+  camera.updateMatrixWorld()
+  camera.updateProjectionMatrix()
+
+  function toScreen(wx: number, wy: number, wz: number) {
+    const v = new THREE.Vector3(wx, wy, wz).project(camera)
+    return { x: (v.x + 1) / 2 * w, y: (1 - v.y) / 2 * h, inFront: v.z < 1 }
+  }
+
+  // Floor grid at y = 0, ±R world units in X and Z
+  const R = 5
+  const lines: [number, number, number, number][] = []
+  for (let i = -R; i <= R; i++) {
+    const a = toScreen(i, 0, -R), b = toScreen(i, 0, R)   // line along Z at x=i
+    const c = toScreen(-R, 0, i), d = toScreen(R, 0, i)   // line along X at z=i
+    if (a.inFront && b.inFront) lines.push([a.x, a.y, b.x, b.y])
+    if (c.inFront && d.inFront) lines.push([c.x, c.y, d.x, d.y])
+  }
+
+  // Horizon: project two far points at camera eye-level (y = cam.position.y)
+  // Both should land on the same screen y, giving us the horizon line.
+  const BIG = 1e5
+  const py = cam.position.y
+  const hl = toScreen(cam.position.x - BIG, py, cam.position.z)
+  const hr = toScreen(cam.position.x + BIG, py, cam.position.z)
+  const horizonY = ((hl.inFront ? hl.y : hr.y) + (hr.inFront ? hr.y : hl.y)) / 2
+
+  return { lines, horizonY }
+}
+
 // ── Step sizes ────────────────────────────────────────────────────────────────
 
 const ORBIT_DEG = 3
@@ -92,18 +132,9 @@ export default function VolumeAlignHUD() {
 
   // ── Perspective grid lines ────────────────────────────────────────────────
   const { w, h } = size
-  const hy = h * 0.42
-  const lvp = { x: -w * 0.4, y: hy }
-  const rvp = { x: w * 1.4,  y: hy }
-
-  const gridLines: [number, number, number, number][] = w > 0 ? [
-    // From left VP → right and bottom edges
-    ...[0, 0.15, 0.35, 0.55, 0.75, 1].map(t => [lvp.x, lvp.y, w, t * h] as [number, number, number, number]),
-    ...[0.25, 0.5, 0.75].map(t => [lvp.x, lvp.y, t * w, h] as [number, number, number, number]),
-    // From right VP → left and bottom edges
-    ...[0, 0.15, 0.35, 0.55, 0.75, 1].map(t => [rvp.x, rvp.y, 0, t * h] as [number, number, number, number]),
-    ...[0.25, 0.5, 0.75].map(t => [rvp.x, rvp.y, t * w, h] as [number, number, number, number]),
-  ] : []
+  const { lines, horizonY: hy } = w > 0
+    ? computeGrid(volume.camera, w, h)
+    : { lines: [], horizonY: h * 0.42 }
 
   return (
     <div className="volume-align-hud">
@@ -112,7 +143,7 @@ export default function VolumeAlignHUD() {
         {w > 0 && (
           <>
             <line x1={0} y1={hy} x2={w} y2={hy} stroke="rgba(96,165,250,0.35)" strokeWidth={1} strokeDasharray="6 4" />
-            {gridLines.map(([x1, y1, x2, y2], i) => (
+            {lines.map(([x1, y1, x2, y2], i) => (
               <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(96,165,250,0.15)" strokeWidth={1} />
             ))}
           </>
