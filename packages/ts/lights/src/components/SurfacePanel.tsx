@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useProject } from '../model/ProjectContext'
-import type { SolidLayer, TextLayer } from '../model/types'
+import type { SolidLayer, TextLayer, VolumeShapeType } from '../model/types'
 import LayerList from './LayerList'
 import GraphConfigPanel from './GraphConfigPanel'
+
+const SHAPE_TYPES: VolumeShapeType[] = ['box', 'sphere', 'cylinder', 'cone']
 
 /**
  * Right sidebar that switches between two modes:
@@ -13,7 +15,7 @@ import GraphConfigPanel from './GraphConfigPanel'
  */
 export default function SurfacePanel() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, surfaceMode } = state
+  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, surfaceMode, volumeEditorMode, selectedShapeId } = state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 
@@ -124,6 +126,59 @@ export default function SurfacePanel() {
     )
   }
 
+  // ── Volume editor mode: shape list ───────────────────────────────────────
+  if (volumeEditorMode && slide?.volume && selectedSlideId) {
+    const shapes = slide.volume.shapes
+    return (
+      <aside className="surface-panel">
+        <div className="surface-panel-header">
+          <span>Shapes</span>
+        </div>
+
+        {shapes.length === 0 ? (
+          <p className="panel-empty">No shapes</p>
+        ) : (
+          <div className="surface-list">
+            {shapes.map(sh => (
+              <div
+                key={sh.id}
+                className={`surface-item${sh.id === selectedShapeId ? ' selected' : ''}`}
+                onClick={() => dispatch({ type: 'volume:shapeSelect', shapeId: sh.id })}
+              >
+                <span className="surface-name">{sh.name}</span>
+                <button
+                  className="icon-btn surface-remove"
+                  title="Remove shape"
+                  onClick={e => {
+                    e.stopPropagation()
+                    dispatch({ type: 'volume:shapeRemove', slideId: selectedSlideId, shapeId: sh.id })
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="surface-panel-header" style={{ marginTop: 'auto' }}>
+          <span>Add shape</span>
+        </div>
+        <div className="volume-shape-picker">
+          {SHAPE_TYPES.map(t => (
+            <button
+              key={t}
+              className="icon-btn volume-shape-btn"
+              onClick={() => dispatch({ type: 'volume:shapeAdd', slideId: selectedSlideId, shapeType: t })}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </aside>
+    )
+  }
+
   // ── Stage mode: surface list ──────────────────────────────────────────────
   return (
     <aside className="surface-panel">
@@ -210,6 +265,13 @@ export default function SurfacePanel() {
         <div className="surface-list">
           <div className="surface-item">
             <span className="surface-name">{slide.volume.name}</span>
+            <button
+              className="icon-btn"
+              title="Edit volume"
+              onClick={() => dispatch({ type: 'volume:editorEnter' })}
+            >
+              ✎
+            </button>
             <button
               className="icon-btn"
               title="Align camera"
