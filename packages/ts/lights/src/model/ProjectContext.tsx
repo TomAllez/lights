@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer } from './types'
+import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume } from './types'
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +52,8 @@ export type ProjectAction =
   | { type: 'layer:select'; layerId: string | null }
   | { type: 'layer:toggle-visibility'; slideId: string; surfaceId: string; layerId: string }
   | { type: 'slide:updateGraphConfig'; slideId: string; config: import('../ipc/types').GraphConfig }
+  | { type: 'volume:add'; slideId: string }
+  | { type: 'volume:remove'; slideId: string }
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -326,6 +328,35 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
         project: {
           ...project,
           slides: project.slides.map(s => s.id === action.slideId ? { ...s, graphConfig: action.config } : s),
+        },
+      }
+
+    case 'volume:add': {
+      const volume: Volume = {
+        id: crypto.randomUUID(),
+        name: 'Volume',
+        camera: {
+          position: { x: 0, y: 2, z: 5 },
+          target: { x: 0, y: 0, z: 0 },
+          fov: 50,
+        },
+        shapes: [],
+      }
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, volume } : s),
+        },
+      }
+    }
+
+    case 'volume:remove':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, volume: undefined } : s),
         },
       }
 
