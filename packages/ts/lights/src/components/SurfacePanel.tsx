@@ -193,6 +193,39 @@ export default function SurfacePanel() {
         </div>
       )}
 
+      <div className="surface-panel-header">
+        <span>Volume</span>
+        {selectedSlideId && !slide?.volume && (
+          <button
+            className="icon-btn"
+            title="Add volume"
+            onClick={() => dispatch({ type: 'volume:add', slideId: selectedSlideId })}
+          >
+            +
+          </button>
+        )}
+      </div>
+
+      {selectedSlideId && slide?.volume ? (
+        <div className="surface-list">
+          <div className="surface-item">
+            <span className="surface-name">{slide.volume.name}</span>
+            <button
+              className="icon-btn surface-remove"
+              title="Remove volume"
+              onClick={e => {
+                e.stopPropagation()
+                dispatch({ type: 'volume:remove', slideId: selectedSlideId })
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : selectedSlideId ? (
+        <p className="panel-empty">No volume</p>
+      ) : null}
+
       <GraphConfigPanel />
     </aside>
   )

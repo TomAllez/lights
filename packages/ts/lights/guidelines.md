@@ -249,7 +249,48 @@ Goal: author real content on surfaces and see it live on the projector.
 
 **Done when**: you can build a multi-surface, multi-slide project with real content, save it, reopen it, and see it projected correctly on the output window.
 
-### Milestone 4 — Event Reactions
+### Milestone 4 — Volumes Editor
+
+Goal: add depth to a scene by compositing a 3D scene onto the stage canvas.
+
+A **Volume** is a single 3D scene attached to a slide. It renders as a separate pass on top of
+the flat surfaces, perspective-matched to the real-world projection environment via a virtual
+camera. `VolumeShape` mirrors `Surface`: same `Layer` and `Reaction` types, same mental model.
+
+```ts
+interface Volume {
+  id: string
+  name: string
+  camera: VolumeCamera  // position, target, fov
+  shapes: VolumeShape[]
+}
+
+interface VolumeShape {
+  id: string; name: string; type: 'box' | 'sphere' | 'cylinder' | 'cone'
+  position, rotation, scale: { x, y, z }
+  layers: Layer[]
+  reactions: Reaction[]
+}
+```
+
+`Slide` gains a `volume?: Volume` field. One Volume per slide.
+
+**Camera alignment** — a HUD activated from the side panel. Overlays a fixed two-point
+perspective grid (horizon + two sets of converging lines) on the stage canvas. Arrow controls
+(orbit / pan / dolly / FOV) nudge `Volume.camera` in fixed increments; the 3D scene updates
+live until the grid matches the physical environment.
+
+**Volume editor** — entering a Volume switches the canvas to a free-orbit 3D editor
+(`OrbitControls` + `TransformControls`). Shapes are created, positioned, and deleted here.
+A "View from projector" button snaps the editor camera to `Volume.camera` for a projection
+preview. A ghost frustum shows the projection camera at all times.
+
+**Done when**: you can add a 3D primitive to a slide, align the virtual camera to the physical
+environment, and see the shape rendered correctly in the projected output.
+
+---
+
+### Milestone 5 — Event Reactions
 
 Goal: make the installation interactive — the fun payoff.
 
@@ -262,7 +303,7 @@ Goal: make the installation interactive — the fun payoff.
 
 **Done when**: waving your hand changes something on a specific surface, configured entirely in the UI.
 
-### Milestone 5 — Calibration & Geometry
+### Milestone 6 — Calibration & Geometry
 
 Goal: replace manual surface placement with automatic geometry detection.
 
