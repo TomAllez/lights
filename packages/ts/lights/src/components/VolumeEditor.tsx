@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
@@ -13,6 +13,9 @@ export default function VolumeEditor() {
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const volume = slide?.volume
+
+  // Refs for Three.js objects shared between setup and reactive effects
+  const [gizmoMode, setGizmoMode] = useState<'translate' | 'rotate' | 'scale'>('translate')
 
   // Refs for Three.js objects shared between setup and reactive effects
   const rendererRef   = useRef<THREE.WebGLRenderer | null>(null)
@@ -211,6 +214,26 @@ export default function VolumeEditor() {
     helper.update()
   }, [volume?.camera])
 
+  // ── Sync gizmo mode → TransformControls ──────────────────────────────────
+  useEffect(() => {
+    transformRef.current?.setMode(gizmoMode)
+  }, [gizmoMode])
+
+  // ── Keyboard shortcuts for gizmo mode ────────────────────────────────────
+  const volumeEditorModeRef = useRef(volumeEditorMode)
+  volumeEditorModeRef.current = volumeEditorMode
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!volumeEditorModeRef.current) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 't' || e.key === 'T') setGizmoMode('translate')
+      if (e.key === 'r' || e.key === 'R') setGizmoMode('rotate')
+      if (e.key === 's' || e.key === 'S') setGizmoMode('scale')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   if (!volume || !volumeEditorMode) return null
 
   function snapToProjector() {
@@ -231,6 +254,18 @@ export default function VolumeEditor() {
           ←
         </button>
         <span className="volume-editor-title">{volume.name}</span>
+        <div className="volume-editor-gizmo-modes">
+          {(['translate', 'rotate', 'scale'] as const).map(mode => (
+            <button
+              key={mode}
+              className={`volume-editor-mode-btn${gizmoMode === mode ? ' active' : ''}`}
+              onClick={() => setGizmoMode(mode)}
+              title={`${mode.charAt(0).toUpperCase() + mode.slice(1)} (${mode[0].toUpperCase()})`}
+            >
+              {mode === 'translate' ? 'Move' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+            </button>
+          ))}
+        </div>
         <button className="volume-editor-projector-btn" onClick={snapToProjector}>
           View from projector
         </button>

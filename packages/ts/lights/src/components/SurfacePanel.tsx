@@ -4,7 +4,7 @@ import type { SolidLayer, TextLayer, VolumeShapeType } from '../model/types'
 import LayerList from './LayerList'
 import GraphConfigPanel from './GraphConfigPanel'
 
-const SHAPE_TYPES: VolumeShapeType[] = ['box', 'sphere', 'cylinder', 'cone']
+const SHAPE_TYPES: VolumeShapeType[] = ['box', 'sphere', 'cylinder', 'cone', 'grid']
 
 /**
  * Right sidebar that switches between two modes:

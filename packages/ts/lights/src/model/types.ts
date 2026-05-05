@@ -25,7 +25,7 @@ export interface Reaction { id: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Calibration {} // populated by M6 (camera-to-projector mapping)
 
-export type VolumeShapeType = 'box' | 'sphere' | 'cylinder' | 'cone'
+export type VolumeShapeType = 'box' | 'sphere' | 'cylinder' | 'cone' | 'grid'
 
 export interface Vec3 { x: number; y: number; z: number }
 
