@@ -8,7 +8,7 @@ import type { VolumeShape } from '../model/types'
 
 export default function VolumeEditor() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedShapeId, volumeEditorMode } = state
+  const { project, selectedSlideId, selectedShapeId, editorMode } = state
   const containerRef = useRef<HTMLDivElement>(null)
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
@@ -220,11 +220,11 @@ export default function VolumeEditor() {
   }, [gizmoMode])
 
   // ── Keyboard shortcuts for gizmo mode ────────────────────────────────────
-  const volumeEditorModeRef = useRef(volumeEditorMode)
-  volumeEditorModeRef.current = volumeEditorMode
+  const editorModeRef = useRef(editorMode)
+  editorModeRef.current = editorMode
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!volumeEditorModeRef.current) return
+      if (editorModeRef.current !== 'volume-editor') return
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 't' || e.key === 'T') setGizmoMode('translate')
       if (e.key === 'r' || e.key === 'R') setGizmoMode('rotate')
@@ -234,7 +234,7 @@ export default function VolumeEditor() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  if (!volume || !volumeEditorMode) return null
+  if (!volume || editorMode !== 'volume-editor') return null
 
   function snapToProjector() {
     const cam = editorCamRef.current

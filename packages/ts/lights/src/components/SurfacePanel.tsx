@@ -15,7 +15,7 @@ const SHAPE_TYPES: VolumeShapeType[] = ['box', 'sphere', 'cylinder', 'cone', 'gr
  */
 export default function SurfacePanel() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, surfaceMode, volumeEditorMode, selectedShapeId } = state
+  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, editorMode, selectedShapeId } = state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 
@@ -36,7 +36,7 @@ export default function SurfacePanel() {
   const surface = surfaces.find(s => s.id === selectedSurfaceId)
 
   // ── Surface mode: layer panel ─────────────────────────────────────────────
-  if (surfaceMode && surface && selectedSlideId) {
+  if (editorMode === 'surface' && surface && selectedSlideId) {
     const selectedLayer = surface.layers.find(l => l.id === selectedLayerId)
     const solidLayer = selectedLayer?.type === 'solid' ? (selectedLayer as SolidLayer) : undefined
     const textLayer = selectedLayer?.type === 'text' ? (selectedLayer as TextLayer) : undefined
@@ -127,7 +127,7 @@ export default function SurfacePanel() {
   }
 
   // ── Volume editor mode: shape list ───────────────────────────────────────
-  if (volumeEditorMode && slide?.volume && selectedSlideId) {
+  if (editorMode === 'volume-editor' && slide?.volume && selectedSlideId) {
     const shapes = slide.volume.shapes
     return (
       <aside className="surface-panel">
