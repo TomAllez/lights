@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProject } from '../model/ProjectContext';
-import { buildSurfaceMesh, disposeSurfaceMesh } from '../shaders/homography';
+import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces } from '../shaders/homography';
+import { buildShapeMesh, disposeShapeMesh } from '../shaders/volumeScene';
 import type { Hand, Landmark } from './canvas/landmarks';
 import {
   decodeFacemesh,
@@ -10,7 +11,6 @@ import {
   drawHands,
   frameRect,
 } from './canvas/landmarks';
-import { preloadSurfaces } from '../shaders/homography';
 
 /**
  * Main stage canvas: renders the live camera frame as a WebGL texture, overlays
@@ -21,6 +21,8 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
+  const volumeGroupRef = useRef<THREE.Group | null>(null);
+  const volumeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
 
   const showVideoRef = useRef(showVideo);
   showVideoRef.current = showVideo;
@@ -30,6 +32,11 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
 
   const surfaces = useMemo(
     () => project.slides.find((s) => s.id === selectedSlideId)?.surfaces ?? [],
+    [project.slides, selectedSlideId],
+  );
+
+  const volume = useMemo(
+    () => project.slides.find((s) => s.id === selectedSlideId)?.volume,
     [project.slides, selectedSlideId],
   );
 
@@ -65,9 +72,27 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     scene.add(surfaceGroup);
     surfaceGroupRef.current = surfaceGroup;
 
+    const volumeScene = new THREE.Scene();
+    const volumeCamera = new THREE.PerspectiveCamera(
+      50,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000,
+    );
+    volumeCamera.position.set(0, 2, 5);
+    volumeCamera.lookAt(0, 0, 0);
+    volumeCameraRef.current = volumeCamera;
+
+    const volumeGroup = new THREE.Group();
+    volumeScene.add(volumeGroup);
+    volumeGroupRef.current = volumeGroup;
+
     const render = () => {
       mesh.visible = showVideoRef.current;
+      renderer.autoClear = true;
       renderer.render(scene, camera);
+      renderer.autoClear = false;
+      renderer.render(volumeScene, volumeCamera);
     };
     renderRef.current = render;
 
@@ -88,6 +113,8 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
       renderer.setSize(w, h);
       overlay.width = w;
       overlay.height = h;
+      volumeCamera.aspect = w / h;
+      volumeCamera.updateProjectionMatrix();
       render();
     }
 
@@ -172,6 +199,27 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
 
   // Re-render when showVideo toggles so the mesh visibility updates immediately.
   useEffect(() => { renderRef.current(); }, [showVideo]);
+
+  // ── Volume scene (rebuilt whenever the active slide's volume changes) ──────
+  useEffect(() => {
+    const group = volumeGroupRef.current;
+    const cam = volumeCameraRef.current;
+    if (!group || !cam) return;
+
+    group.traverse(child => { if (child instanceof THREE.Mesh) disposeShapeMesh(child as THREE.Mesh) });
+    group.clear();
+
+    if (volume) {
+      const { position: p, target: t, fov } = volume.camera;
+      cam.position.set(p.x, p.y, p.z);
+      cam.lookAt(new THREE.Vector3(t.x, t.y, t.z));
+      cam.fov = fov;
+      cam.updateProjectionMatrix();
+      for (const shape of volume.shapes) group.add(buildShapeMesh(shape));
+    }
+
+    renderRef.current();
+  }, [volume]);
 
   // ── Surface meshes (rebuilt whenever the active slide's surfaces change) ──
   useEffect(() => {
