@@ -12,6 +12,7 @@ const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL
 
 let win: BrowserWindow | null = null
 let outputWin: BrowserWindow | null = null
+let graphHandlers: { stop: () => void } | null = null
 let lastSlide: unknown = null
 let currentFilePath: string | null = null
 let isDirty = false
@@ -163,7 +164,12 @@ function createOutputWindow() {
     },
   })
 
-  outputWin.on('closed', () => { outputWin = null })
+  outputWin.on('closed', () => { 
+    outputWin = null 
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('output:closed')
+    }
+  })
 
   outputWin.webContents.on('did-finish-load', () => {
     if (lastSlide !== null) outputWin?.webContents.send('output:render', lastSlide)
@@ -211,11 +217,13 @@ function createWindow() {
 
   win.on('closed', () => {
     win = null
+    graphHandlers?.stop()
+    graphHandlers = null
+    outputWin?.close()
   })
 
   if (DEV_SERVER_URL) {
     win.loadURL(DEV_SERVER_URL)
-    win.webContents.openDevTools()
   } else {
     win.loadFile(path.join(process.env.APP_ROOT!, 'dist/index.html'))
   }
@@ -225,7 +233,12 @@ app.whenReady().then(() => {
   buildMenu()
   createWindow()
   createOutputWindow()
-  registerGraphHandlers(win!)
+  graphHandlers = registerGraphHandlers(win!)
+})
+
+app.on('before-quit', () => {
+  graphHandlers?.stop()
+  outputWin?.close()
 })
 
 app.on('window-all-closed', () => {

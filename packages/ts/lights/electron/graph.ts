@@ -32,22 +32,25 @@ const MODULE_MAP: Partial<Record<string, AvailableModule>> = {
   'face-mesh': AvailableModule.FaceMeshEstimation,
 }
 
-const CAPTURE_WIDTH = 640
+const CAPTURE_WIDTH = 940
 const CAPTURE_HEIGHT = 480
 
 // ── Graph handler ─────────────────────────────────────────────────────────────
 
-export function registerGraphHandlers(mainWindow: BrowserWindow): void {
+export function registerGraphHandlers(mainWindow: BrowserWindow) {
   let graph: Graph | null = null
 
   function emit(event: GraphEvent) {
+    if (mainWindow.isDestroyed()) return
     mainWindow.webContents.send('graph:event', event)
   }
 
   function stopGraph() {
     graph?.stop()
     graph = null
-    emit({ type: 'graph:status', status: GraphStatus.Stopped })
+    if (!mainWindow.isDestroyed()) {
+      emit({ type: 'graph:status', status: GraphStatus.Stopped })
+    }
   }
 
   function startGraph(config: GraphConfig) {
@@ -108,7 +111,7 @@ export function registerGraphHandlers(mainWindow: BrowserWindow): void {
     emit({ type: 'graph:status', status: GraphStatus.Running })
   }
 
-  ipcMain.on('graph:command', (_event, cmd: GraphCommand) => {
+  const onCommand = (_event: Electron.IpcMainEvent, cmd: GraphCommand) => {
     switch (cmd.type) {
       case 'slide:activate':
         startGraph(cmd.config)
@@ -120,5 +123,14 @@ export function registerGraphHandlers(mainWindow: BrowserWindow): void {
         // TODO: hot-update module params without graph restart
         break
     }
-  })
+  }
+
+  ipcMain.on('graph:command', onCommand)
+
+  return {
+    stop: () => {
+      stopGraph()
+      ipcMain.removeListener('graph:command', onCommand)
+    }
+  }
 }

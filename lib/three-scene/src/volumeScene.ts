@@ -9,7 +9,7 @@ function buildCalibrationGridMaterial(): THREE.MeshBasicMaterial {
   canvas.height = px
   const ctx = canvas.getContext('2d')!
 
-  ctx.fillStyle = '#000'
+  ctx.fillStyle = '#00000000'
   ctx.fillRect(0, 0, px, px)
 
   const step = px / divs
