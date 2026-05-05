@@ -23,7 +23,35 @@ export type Layer = SolidLayer | ImageLayer | TextLayer
 
 export interface Reaction { id: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Calibration {} // populated by M5 (camera-to-projector mapping)
+export interface Calibration {} // populated by M6 (camera-to-projector mapping)
+
+export type VolumeShapeType = 'box' | 'sphere' | 'cylinder' | 'cone' | 'grid'
+
+export interface Vec3 { x: number; y: number; z: number }
+
+export interface VolumeCamera {
+  position: Vec3
+  target: Vec3
+  fov: number
+}
+
+export interface VolumeShape {
+  id: string
+  name: string
+  type: VolumeShapeType
+  position: Vec3
+  rotation: Vec3  // Euler XYZ degrees
+  scale: Vec3
+  layers: Layer[]
+  reactions: Reaction[]
+}
+
+export interface Volume {
+  id: string
+  name: string
+  camera: VolumeCamera
+  shapes: VolumeShape[]
+}
 
 export interface Surface {
   id: string
@@ -39,6 +67,7 @@ export interface Slide {
   name: string
   surfaces: Surface[]
   graphConfig: GraphConfig
+  volume?: Volume
 }
 
 export interface Project {
