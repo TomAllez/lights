@@ -814,6 +814,13 @@ body,
   color: #60a5fa;
 }
 
+.volume-editor-separator {
+  width: 1px;
+  height: 20px;
+  background: #333;
+  margin: 0 4px;
+}
+
 .volume-editor-projector-btn {
   background: none;
   border: 1px solid #2a2a2a;

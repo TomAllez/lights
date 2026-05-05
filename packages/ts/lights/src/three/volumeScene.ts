@@ -57,6 +57,24 @@ export function buildShapeMesh(shape: VolumeShape): THREE.Mesh {
   }
 
   const mesh = new THREE.Mesh(geo, mat)
+  mesh.userData.type = shape.type
+
+  if (shape.vertices && shape.vertices.length > 0) {
+    const posAttr = geo.getAttribute('position') as THREE.BufferAttribute
+    
+    // If we have custom indices, we might need a non-indexed geometry or update index
+    if (shape.indices && shape.indices.length > 0) {
+      geo.setIndex(shape.indices)
+    }
+
+    const count = Math.min(posAttr.count, shape.vertices.length / 3)
+    for (let i = 0; i < count; i++) {
+      posAttr.setXYZ(i, shape.vertices[i * 3], shape.vertices[i * 3 + 1], shape.vertices[i * 3 + 2])
+    }
+    posAttr.needsUpdate = true
+    geo.computeVertexNormals()
+  }
+
   mesh.position.set(shape.position.x, shape.position.y, shape.position.z)
   mesh.rotation.set(
     shape.rotation.x * Math.PI / 180,

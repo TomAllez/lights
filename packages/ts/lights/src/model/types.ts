@@ -27,6 +27,8 @@ export interface Calibration {} // populated by M6 (camera-to-projector mapping)
 
 export type VolumeShapeType = 'box' | 'sphere' | 'cylinder' | 'cone' | 'grid'
 
+export type VolumeEditMode = 'object' | 'vertex'
+
 export interface Vec3 { x: number; y: number; z: number }
 
 export interface VolumeCamera {
@@ -42,6 +44,8 @@ export interface VolumeShape {
   position: Vec3
   rotation: Vec3  // Euler XYZ degrees
   scale: Vec3
+  vertices?: number[] // Optional custom vertex offsets [x0, y0, z0, x1, y1, z1, ...]
+  indices?: number[]  // Optional custom indices for non-primitive topology
   layers: Layer[]
   reactions: Reaction[]
 }

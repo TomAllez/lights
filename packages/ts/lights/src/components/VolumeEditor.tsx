@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProject } from '../model/ProjectContext'
-import { VolumeScene, type GizmoMode } from '../shaders/VolumeSceneManager'
+import { VolumeScene, type GizmoMode } from '../three/VolumeSceneManager'
+import type { VolumeEditMode } from '../model/types'
 
 export default function VolumeEditor() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedShapeId, editorMode } = state
+  const { project, selectedSlideId, selectedShapeId, editorMode, volumeEditMode } = state
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<VolumeScene | null>(null)
 
@@ -38,8 +39,8 @@ export default function VolumeEditor() {
 
   // ── Sync: Volume Data & Selection ──────────────────────────────────────────
   useEffect(() => {
-    sceneRef.current?.syncVolume(volume, selectedShapeId)
-  }, [volume, selectedShapeId])
+    sceneRef.current?.syncVolume(volume, selectedShapeId, volumeEditMode)
+  }, [volume, selectedShapeId, volumeEditMode])
 
   // ── Sync: Gizmo Mode ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -56,11 +57,18 @@ export default function VolumeEditor() {
       if (key === 't') setGizmoMode('translate')
       if (key === 'r') setGizmoMode('rotate')
       if (key === 's') setGizmoMode('scale')
+      if (key === 'tab') {
+        e.preventDefault()
+        dispatch({ type: 'volume:editModeSet', mode: volumeEditMode === 'object' ? 'vertex' : 'object' })
+      }
+      if ((key === 'delete' || key === 'backspace') && volumeEditMode === 'vertex') {
+        sceneRef.current?.deleteSelectedVertex()
+      }
     }
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [editorMode])
+  }, [editorMode, volumeEditMode, dispatch])
 
   if (!volume || editorMode !== 'volume-editor') return null
 
@@ -72,6 +80,18 @@ export default function VolumeEditor() {
           ←
         </button>
         <span className="volume-editor-title">{volume.name}</span>
+        <div className="volume-editor-gizmo-modes">
+          {(['object', 'vertex'] as const).map(mode => (
+            <button
+              key={mode}
+              className={`volume-editor-mode-btn${volumeEditMode === mode ? ' active' : ''}`}
+              onClick={() => dispatch({ type: 'volume:editModeSet', mode })}
+            >
+              {mode.charAt(0).toUpperCase() + mode.slice(1)} Mode
+            </button>
+          ))}
+        </div>
+        <div className="volume-editor-separator" />
         <div className="volume-editor-gizmo-modes">
           {(['translate', 'rotate', 'scale'] as const).map(mode => (
             <button

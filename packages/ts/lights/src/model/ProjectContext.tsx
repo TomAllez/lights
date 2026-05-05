@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera } from './types'
+import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera, VolumeEditMode } from './types'
 
 export type EditorMode = 'stage' | 'surface' | 'volume-align' | 'volume-editor'
 
@@ -12,6 +12,7 @@ export interface ProjectState {
   selectedSurfaceId: string | null
   selectedLayerId: string | null
   editorMode: EditorMode
+  volumeEditMode: VolumeEditMode
   selectedShapeId: string | null
   isDirty: boolean
   currentFilePath: string | null
@@ -23,6 +24,7 @@ const initial: ProjectState = {
   selectedSurfaceId: null,
   selectedLayerId: null,
   editorMode: 'stage',
+  volumeEditMode: 'object',
   selectedShapeId: null,
   isDirty: false,
   currentFilePath: null,
@@ -67,6 +69,7 @@ export type ProjectAction =
   | { type: 'volume:shapeRemove'; slideId: string; shapeId: string }
   | { type: 'volume:shapeUpdate'; slideId: string; shape: import('./types').VolumeShape }
   | { type: 'volume:shapeSelect'; shapeId: string | null }
+  | { type: 'volume:editModeSet'; mode: VolumeEditMode }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -486,6 +489,8 @@ function applyVolumeAction(state: ProjectState, action: VolumeAction): ProjectSt
 
     case 'volume:shapeSelect':
       return { ...state, selectedShapeId: action.shapeId }
+    case 'volume:editModeSet':
+      return { ...state, volumeEditMode: action.mode }
 
     default:
       return state
