@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
-import type { Volume, VolumeShape, VolumeEditMode } from '../model/types'
+import type { Volume, VolumeShape, VolumeEditMode } from './types'
 import { buildShapeMesh, disposeShapeMesh } from './volumeScene'
 
 export type GizmoMode = 'translate' | 'rotate' | 'scale'
@@ -30,9 +30,9 @@ export class VolumeScene {
   private resizeObserver: ResizeObserver
 
   private editMode: VolumeEditMode = 'object'
-  private vertexHandles: THREE.Group = new THREE.Group()
-  private selectedVertexIndex: number | null = null
-  private vertexProxy = new THREE.Object3D()
+  private handles: THREE.Group = new THREE.Group()
+  private selectedComponentIndices: number[] | null = null
+  private componentProxy = new THREE.Object3D()
 
   constructor(options: VolumeSceneOptions) {
     this.options = options
@@ -56,8 +56,8 @@ export class VolumeScene {
     this.scene.add(dir)
 
     this.scene.add(this.shapeGroup)
-    this.scene.add(this.vertexHandles)
-    this.scene.add(this.vertexProxy)
+    this.scene.add(this.handles)
+    this.scene.add(this.componentProxy)
 
     // 3. Cameras & Controls
     const aspect = container.clientWidth / container.clientHeight
@@ -89,13 +89,13 @@ export class VolumeScene {
   private setupEvents() {
     // Pause orbit while dragging transform gizmo
     this.transform.addEventListener('dragging-changed', (e) => {
-      this.orbit.enabled = !(e as any).value
+      this.orbit.enabled = !e.value
     })
 
     // Dispatch shape update when drag ends
     this.transform.addEventListener('mouseUp', () => {
-      if (this.editMode === 'vertex' && this.selectedVertexIndex !== null) {
-        this.saveVertexChange()
+      if (this.editMode !== 'object' && this.selectedComponentIndices !== null) {
+        this.saveComponentChange()
         return
       }
 
@@ -116,8 +116,8 @@ export class VolumeScene {
     })
 
     this.transform.addEventListener('change', () => {
-      if (this.editMode === 'vertex' && this.selectedVertexIndex !== null && this.transform.dragging) {
-        this.applyVertexDragging()
+      if (this.editMode !== 'object' && this.selectedComponentIndices !== null && this.transform.dragging) {
+        this.applyComponentDragging()
       }
     })
 
@@ -137,15 +137,15 @@ export class VolumeScene {
     const raycaster = new THREE.Raycaster()
     raycaster.setFromCamera(mouse, this.editorCam)
     
-    if (this.editMode === 'vertex') {
-      const hits = raycaster.intersectObjects(this.vertexHandles.children)
+    if (this.editMode !== 'object') {
+      const hits = raycaster.intersectObjects(this.handles.children)
       if (hits.length > 0) {
         const handle = hits[0].object
-        this.selectedVertexIndex = handle.userData.index
-        this.vertexProxy.position.copy(handle.position)
-        this.transform.attach(this.vertexProxy)
+        this.selectedComponentIndices = handle.userData.indices
+        this.componentProxy.position.copy(handle.position)
+        this.transform.attach(this.componentProxy)
       } else {
-        this.selectedVertexIndex = null
+        this.selectedComponentIndices = null
         this.transform.detach()
       }
       return
@@ -178,10 +178,10 @@ export class VolumeScene {
     this.renderer.render(this.scene, this.editorCam)
   }
 
-  // ── Vertex Editing ──────────────────────────────────────────────────
-
-  deleteSelectedVertex() {
-    if (!this.selectedShapeId || this.selectedVertexIndex === null) return
+  // ── Mesh Component Editing ──────────────────────────────────────────
+  
+  deleteSelectedComponent() {
+    if (!this.selectedShapeId || !this.selectedComponentIndices) return
     const mesh = this.meshMap.get(this.selectedShapeId)
     if (!mesh) return
 
@@ -189,46 +189,37 @@ export class VolumeScene {
     let indices = geo.getIndex()?.array ? Array.from(geo.getIndex()!.array) : null
     const positions = geo.getAttribute('position') as THREE.BufferAttribute
     
-    // If it's a primitive without custom indices yet, we need to generate them
     if (!indices) {
-      // Non-indexed geometry: every 3 vertices form a triangle
-      // We'll convert it to indexed first for easier deletion
-      const count = positions.count
       indices = []
-      for (let i = 0; i < count; i++) indices.push(i)
+      for (let i = 0; i < positions.count; i++) indices.push(i)
     }
 
-    const vertexToRemove = this.selectedVertexIndex
+    const toRemove = new Set(this.selectedComponentIndices)
     
-    // 1. Remove all triangles that use this vertex
+    // 1. Remove all triangles that use ANY of the selected vertices
     const newIndices: number[] = []
     for (let i = 0; i < indices.length; i += 3) {
       const a = indices[i]
       const b = indices[i + 1]
       const c = indices[i + 2]
-      if (a !== vertexToRemove && b !== vertexToRemove && c !== vertexToRemove) {
+      if (!toRemove.has(a) && !toRemove.has(b) && !toRemove.has(c)) {
         newIndices.push(a, b, c)
       }
     }
 
-    // 2. We don't necessarily remove the vertex from the position buffer to avoid re-indexing everything
-    // but the user might expect it to be gone. 
-    // In Blender, if you delete a vertex, it's GONE.
-    // If we want to keep it simple, we just remove the faces.
-    // But then the vertex handle will still be there.
-    
-    // To truly remove it:
-    // a. Create new position array without that vertex
+    // 2. Remove selected vertices from the position buffer
     const newVertices: number[] = []
+    const indexMap = new Map<number, number>()
+    let nextIdx = 0
     for (let i = 0; i < positions.count; i++) {
-      if (i === vertexToRemove) continue
+      if (toRemove.has(i)) continue
       newVertices.push(positions.getX(i), positions.getY(i), positions.getZ(i))
+      indexMap.set(i, nextIdx++)
     }
 
-    // b. Shift indices that were after the removed vertex
-    const finalIndices = newIndices.map(idx => (idx > vertexToRemove ? idx - 1 : idx))
+    // 3. Shift indices to match new position buffer
+    const finalIndices = newIndices.map(idx => indexMap.get(idx)!)
 
-    // 3. Update the mesh and state
     const shape = (mesh.userData as { shape: VolumeShape }).shape
     this.options.onShapeUpdate({
       ...shape,
@@ -236,32 +227,74 @@ export class VolumeScene {
       indices: finalIndices
     })
 
-    this.selectedVertexIndex = null
+    this.selectedComponentIndices = null
     this.transform.detach()
   }
 
-  private applyVertexDragging() {
-    if (!this.selectedShapeId || this.selectedVertexIndex === null) return
+  private applyComponentDragging() {
+    if (!this.selectedShapeId || !this.selectedComponentIndices) return
     const mesh = this.meshMap.get(this.selectedShapeId)
     if (!mesh) return
 
-    const pos = this.vertexProxy.position
-    const handle = this.vertexHandles.children.find(c => c.userData.index === this.selectedVertexIndex)
-    if (handle) handle.position.copy(pos)
+    const worldPos = this.componentProxy.position
+    
+    // Update visual handle position (it's in world space)
+    const handle = this.handles.children.find(c => {
+      const hIndices = c.userData.indices as number[]
+      return hIndices.length === this.selectedComponentIndices!.length && 
+             hIndices.every((v, i) => v === this.selectedComponentIndices![i])
+    })
+    if (handle) handle.position.copy(worldPos)
 
     const attr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
-    
-    // The proxy is in world space, we need it in local space of the mesh
-    const localPos = pos.clone()
     mesh.updateMatrixWorld()
-    mesh.worldToLocal(localPos)
+    
+    // @ts-expect-error Three.js Mesh has matrixWorldInverse but it might not be in the typings
+    mesh.matrixWorldInverse.copy(mesh.matrixWorld).invert()
 
-    attr.setXYZ(this.selectedVertexIndex, localPos.x, localPos.y, localPos.z)
+    // Calculate delta in local space? No, easier to just move each vertex to its new local position.
+    // We need to know where the component was relative to the proxy when drag started.
+    // Actually, TransformControls moves the proxy. We can just compute the new world position
+    // of each vertex and convert back to local.
+    // But since handles are shared, and we might select an edge/face, 
+    // all vertices in selectedComponentIndices should move by the same world delta.
+
+    // Let's use a simpler approach: 
+    // Each vertex in the component will be moved so that their center matches the proxy.
+    // Wait, if I move one vertex of an edge, I want just that vertex to move.
+    // If I move the edge handle, I want both vertices to move by the same amount.
+
+    if (!this._dragStartPos || !this._vertexStartPos) {
+        this._dragStartPos = worldPos.clone()
+        this._vertexStartPos = this.selectedComponentIndices.map(idx => {
+            const v = new THREE.Vector3(attr.getX(idx), attr.getY(idx), attr.getZ(idx))
+            v.applyMatrix4(mesh.matrixWorld)
+            return v
+        })
+    }
+
+    const delta = new THREE.Vector3().subVectors(worldPos, this._dragStartPos)
+
+    for (let i = 0; i < this.selectedComponentIndices.length; i++) {
+        const idx = this.selectedComponentIndices[i]
+        const startWorld = this._vertexStartPos[i]
+        const newWorld = startWorld.clone().add(delta)
+        const newLocal = newWorld.clone()
+        mesh.worldToLocal(newLocal)
+        attr.setXYZ(idx, newLocal.x, newLocal.y, newLocal.z)
+    }
+
     attr.needsUpdate = true
     mesh.geometry.computeVertexNormals()
   }
 
-  private saveVertexChange() {
+  private _dragStartPos: THREE.Vector3 | null = null
+  private _vertexStartPos: THREE.Vector3[] | null = null
+
+  private saveComponentChange() {
+    this._dragStartPos = null
+    this._vertexStartPos = null
+    
     if (!this.selectedShapeId) return
     const mesh = this.meshMap.get(this.selectedShapeId)
     if (!mesh) return
@@ -283,30 +316,66 @@ export class VolumeScene {
     })
   }
 
-  private updateVertexHandles(mesh: THREE.Mesh | undefined) {
-    this.vertexHandles.clear()
-    this.selectedVertexIndex = null
-    if (this.editMode !== 'vertex' || !mesh) return
+  private updateHandles(mesh: THREE.Mesh | undefined) {
+    this.handles.clear()
+    this.selectedComponentIndices = null
+    if (this.editMode === 'object' || !mesh) return
 
     const attr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
-    const geo = new THREE.SphereGeometry(0.04)
-    const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-
+    const indicesAttr = mesh.geometry.getIndex()
+    const indices = indicesAttr ? Array.from(indicesAttr.array) : null
+    
     mesh.updateMatrixWorld()
 
-    for (let i = 0; i < attr.count; i++) {
-      const handle = new THREE.Mesh(geo, mat)
-      handle.position.set(attr.getX(i), attr.getY(i), attr.getZ(i))
-      handle.applyMatrix4(mesh.matrixWorld)
-      handle.userData.index = i
-      this.vertexHandles.add(handle)
+    if (this.editMode === 'vertex') {
+      const geo = new THREE.SphereGeometry(0.04)
+      const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+      for (let i = 0; i < attr.count; i++) {
+        const handle = new THREE.Mesh(geo, mat)
+        handle.position.set(attr.getX(i), attr.getY(i), attr.getZ(i))
+        handle.applyMatrix4(mesh.matrixWorld)
+        handle.userData.indices = [i]
+        this.handles.add(handle)
+      }
+    } else if (this.editMode === 'edge' && indices) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0x0000ff })
+      const geo = new THREE.SphereGeometry(0.03) // Small handles on edges
+      const edges = new Set<string>()
+      for (let i = 0; i < indices.length; i += 3) {
+        const tri = [indices[i], indices[i+1], indices[i+2]]
+        for (let j = 0; j < 3; j++) {
+          const a = tri[j]
+          const b = tri[(j + 1) % 3]
+          const key = [a, b].sort().join('-')
+          if (!edges.has(key)) {
+            edges.add(key)
+            const handle = new THREE.Mesh(geo, mat)
+            const va = new THREE.Vector3(attr.getX(a), attr.getY(a), attr.getZ(a))
+            const vb = new THREE.Vector3(attr.getX(b), attr.getY(b), attr.getZ(b))
+            handle.position.addVectors(va, vb).multiplyScalar(0.5)
+            handle.applyMatrix4(mesh.matrixWorld)
+            handle.userData.indices = [a, b]
+            this.handles.add(handle)
+          }
+        }
+      }
+    } else if (this.editMode === 'face' && indices) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+      const geo = new THREE.SphereGeometry(0.05)
+      for (let i = 0; i < indices.length; i += 3) {
+        const a = indices[i], b = indices[i+1], c = indices[i+2]
+        const handle = new THREE.Mesh(geo, mat)
+        const va = new THREE.Vector3(attr.getX(a), attr.getY(a), attr.getZ(a))
+        const vb = new THREE.Vector3(attr.getX(b), attr.getY(b), attr.getZ(b))
+        const vc = new THREE.Vector3(attr.getX(c), attr.getY(c), attr.getZ(c))
+        handle.position.addVectors(va, vb).add(vc).multiplyScalar(1/3)
+        handle.applyMatrix4(mesh.matrixWorld)
+        handle.userData.indices = [a, b, c]
+        this.handles.add(handle)
+      }
     }
   }
 
-  private getMeshByShapeId(shapeId: string | null): THREE.Mesh | undefined {
-    if (!shapeId) return undefined
-    return this.meshMap.get(shapeId)
-  }
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -319,7 +388,7 @@ export class VolumeScene {
     this.selectedShapeId = selectedShapeId
 
     // 1. Identify which meshes to add, update, or remove
-    const shapeIds = new Set(currentShapes.map(s => s.id))
+    const shapeIds = new Set(currentShapes.map((s: VolumeShape) => s.id))
     
     // Remove old meshes
     for (const [id, mesh] of this.meshMap.entries()) {
@@ -333,14 +402,14 @@ export class VolumeScene {
 
     // Add or Update meshes
     for (const shape of currentShapes) {
-      let mesh = this.meshMap.get(shape.id)
+      const mesh = this.meshMap.get(shape.id)
       
       if (!mesh) {
         // Create new
-        mesh = buildShapeMesh(shape)
-        mesh.userData = { shape }
-        this.meshMap.set(shape.id, mesh)
-        this.shapeGroup.add(mesh)
+        const newMesh = buildShapeMesh(shape)
+        newMesh.userData = { shape }
+        this.meshMap.set(shape.id, newMesh)
+        this.shapeGroup.add(newMesh)
       } else {
         // Update existing (position, rotation, scale)
         // We only update if the shape data has changed (simple comparison)
@@ -364,13 +433,13 @@ export class VolumeScene {
     // 2. Sync selection
     const sel = selectedShapeId ? this.meshMap.get(selectedShapeId) : undefined
 
-    if (this.editMode === 'vertex') {
+    if (this.editMode !== 'object') {
       if (selectionChanged || modeChanged) {
-        this.updateVertexHandles(sel)
+        this.updateHandles(sel)
         this.transform.detach()
       }
     } else {
-      this.vertexHandles.clear()
+      this.handles.clear()
       if (sel) this.transform.attach(sel)
       else this.transform.detach()
     }

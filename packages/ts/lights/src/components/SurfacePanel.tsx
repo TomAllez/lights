@@ -132,11 +132,11 @@ export default function SurfacePanel() {
     const selectedShape = shapes.find(s => s.id === selectedShapeId)
 
     const updateShape = (patch: Partial<import('../model/types').VolumeShape>) => {
-      if (selectedShape) {
+      if (selectedShape && selectedSlideId) {
         dispatch({
           type: 'volume:shapeUpdate',
           slideId: selectedSlideId,
-          shape: { ...selectedShape, ...patch } as any
+          shape: { ...selectedShape, ...patch }
         })
       }
     }

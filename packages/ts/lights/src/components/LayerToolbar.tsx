@@ -3,9 +3,9 @@ import { Square, Image as ImageIcon, Type } from 'lucide-react'
 
 export default function LayerToolbar() {
   const { state, dispatch } = useProject()
-  const { surfaceMode, selectedSlideId, selectedSurfaceId } = state
+  const { editorMode, selectedSlideId, selectedSurfaceId } = state
 
-  if (!surfaceMode || !selectedSlideId || !selectedSurfaceId) return null
+  if (editorMode !== 'surface' || !selectedSlideId || !selectedSurfaceId) return null
 
   function addSolid() {
     dispatch({ type: 'layer:add', slideId: selectedSlideId!, surfaceId: selectedSurfaceId! })

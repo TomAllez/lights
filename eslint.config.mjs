@@ -15,6 +15,8 @@ export default ts.config(
             'packages/ts/*/vitest.config.ts',
             'packages/ts/*/vite.config.ts',
             'packages/ts/*/eslint.config.mjs',
+            'packages/ts/modules/*/vitest.config.ts',
+            'packages/ts/modules/*/eslint.config.mjs',
             'vitest.workspace.ts',
             'eslint.base.config.mjs',
             'eslint.config.mjs',

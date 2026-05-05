@@ -1,5 +1,5 @@
 {
-  "name": "@lights/application",
+  "name": "@lights/renderer-websocket",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -14,15 +14,11 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "application"
-  },
-  "scripts": {
-    "start": "node --loader @swc-node/register/esm src/index.ts"
+    "name": "@lights/renderer-websocket"
   },
   "dependencies": {
-    "@lights/graph": "*",
-    "@lights/driver-ffmpeg": "*",
-    "@lights/renderer-websocket": "*",
-    "@lights/python-module": "*"
+    "@lights/renderer": "*",
+    "@lights/io": "*",
+    "ws": "*"
   }
 }

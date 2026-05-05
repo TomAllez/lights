@@ -1,66 +1,38 @@
-import type { Point, GraphConfig } from '../ipc/types'
+import type { Point as BasePoint, GraphConfig } from '../ipc/types'
+import type { 
+  VolumeShapeType, VolumeEditMode, Vec3, VolumeCamera, 
+  VolumeShape as BaseVolumeShape, Volume as BaseVolume,
+  SolidLayer as BaseSolidLayer, ImageLayer as BaseImageLayer, TextLayer as BaseTextLayer,
+  LayerTransform as BaseLayerTransform, Point, Surface as BaseSurface
+} from '@lights/three-scene'
 
-export type { Point, GraphConfig }
+export type { GraphConfig, VolumeShapeType, VolumeEditMode, Vec3, VolumeCamera, Point }
 
-export type Polygon = Point[]
+export type Polygon = BasePoint[]
 
-export interface LayerTransform {
-  x: number        // center, normalized [0,1]
-  y: number        // center, normalized [0,1]
-  w: number        // width fraction [0,1]
-  h: number        // height fraction [0,1]
+export interface LayerTransform extends BaseLayerTransform {
   rotation: number // degrees
 }
 
-export interface SolidLayer { id: string; type: 'solid'; name: string; visible: boolean; color: string; transform: LayerTransform }
-
-/** Image layer — src is an absolute file path (or data: URL when serialised). */
-export interface ImageLayer { id: string; type: 'image'; name: string; visible: boolean; src: string; transform: LayerTransform }
-
-export interface TextLayer { id: string; type: 'text'; name: string; visible: boolean; content: string; fontSize: number; color: string; transform: LayerTransform }
-
+export interface SolidLayer extends BaseSolidLayer { transform: LayerTransform }
+export interface ImageLayer extends BaseImageLayer { transform: LayerTransform }
+export interface TextLayer extends BaseTextLayer { transform: LayerTransform }
 export type Layer = SolidLayer | ImageLayer | TextLayer
 
 export interface Reaction { id: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface Calibration {} // populated by M6 (camera-to-projector mapping)
 
-export type VolumeShapeType = 'box' | 'sphere' | 'cylinder' | 'cone' | 'grid'
-
-export type VolumeEditMode = 'object' | 'vertex'
-
-export interface Vec3 { x: number; y: number; z: number }
-
-export interface VolumeCamera {
-  position: Vec3
-  target: Vec3
-  fov: number
-}
-
-export interface VolumeShape {
-  id: string
-  name: string
-  type: VolumeShapeType
-  position: Vec3
-  rotation: Vec3  // Euler XYZ degrees
-  scale: Vec3
-  vertices?: number[] // Optional custom vertex offsets [x0, y0, z0, x1, y1, z1, ...]
-  indices?: number[]  // Optional custom indices for non-primitive topology
+export interface VolumeShape extends BaseVolumeShape {
   layers: Layer[]
   reactions: Reaction[]
 }
 
-export interface Volume {
-  id: string
-  name: string
-  camera: VolumeCamera
+export interface Volume extends Omit<BaseVolume, 'shapes'> {
   shapes: VolumeShape[]
 }
 
-export interface Surface {
-  id: string
-  name: string
-  outputPolygon: [Point, Point, Point, Point]
+export interface Surface extends Omit<BaseSurface, 'layers'> {
   areaOfInterest?: Polygon
   layers: Layer[]
   reactions: Reaction[]

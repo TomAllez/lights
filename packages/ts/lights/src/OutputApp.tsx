@@ -1,8 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { Slide } from './model/types';
-import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces } from './three/homography';
-import { buildShapeMesh, disposeShapeMesh } from './three/volumeScene';
+import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
 
 export default function OutputApp() {
   const containerRef = useRef<HTMLDivElement>(null);

@@ -14,7 +14,7 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "driver-ffmpeg"
+    "name": "@lights/driver-ffmpeg"
   },
   "dependencies": {
     "@lights/driver": "*",

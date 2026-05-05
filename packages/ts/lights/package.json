@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist-electron/main.js",
   "nx": {
-    "name": "lights",
+    "name": "@lights/app",
     "targets": {
       "typecheck": {
         "command": "tsc --noEmit",

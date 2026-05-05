@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { VolumeShape } from '../model/types'
+import type { VolumeShape } from './types'
 
 function buildCalibrationGridMaterial(): THREE.MeshBasicMaterial {
   const px = 512
@@ -39,7 +39,7 @@ function buildCalibrationGridMaterial(): THREE.MeshBasicMaterial {
 }
 
 export function buildShapeMesh(shape: VolumeShape): THREE.Mesh {
-  let geo: THREE.BufferGeometry
+  let geo: THREE.BufferGeometry | undefined
   let mat: THREE.Material
 
   if (shape.type === 'grid') {
@@ -54,6 +54,10 @@ export function buildShapeMesh(shape: VolumeShape): THREE.Mesh {
       case 'cone':     geo = new THREE.ConeGeometry(0.5, 1, 32); break
     }
     mat = new THREE.MeshNormalMaterial()
+  }
+
+  if (!geo) {
+    geo = new THREE.BufferGeometry()
   }
 
   const mesh = new THREE.Mesh(geo, mat)

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useProject } from '../model/ProjectContext'
-import { VolumeScene, type GizmoMode } from '../three/VolumeSceneManager'
+import { VolumeScene, type GizmoMode } from '@lights/three-scene'
 import type { VolumeEditMode } from '../model/types'
 
 export default function VolumeEditor() {
@@ -25,7 +25,7 @@ export default function VolumeEditor() {
       },
       onShapeUpdate: (shape) => {
         if (selectedSlideId) {
-          dispatch({ type: 'volume:shapeUpdate', slideId: selectedSlideId, shape })
+          dispatch({ type: 'volume:shapeUpdate', slideId: selectedSlideId, shape: shape as import('../model/types').VolumeShape })
         }
       }
     })
@@ -59,10 +59,12 @@ export default function VolumeEditor() {
       if (key === 's') setGizmoMode('scale')
       if (key === 'tab') {
         e.preventDefault()
-        dispatch({ type: 'volume:editModeSet', mode: volumeEditMode === 'object' ? 'vertex' : 'object' })
+        const modes: VolumeEditMode[] = ['object', 'vertex', 'edge', 'face']
+        const nextIdx = (modes.indexOf(volumeEditMode) + 1) % modes.length
+        dispatch({ type: 'volume:editModeSet', mode: modes[nextIdx] })
       }
-      if ((key === 'delete' || key === 'backspace') && volumeEditMode === 'vertex') {
-        sceneRef.current?.deleteSelectedVertex()
+      if ((key === 'delete' || key === 'backspace') && volumeEditMode !== 'object') {
+        sceneRef.current?.deleteSelectedComponent()
       }
     }
 
@@ -81,13 +83,13 @@ export default function VolumeEditor() {
         </button>
         <span className="volume-editor-title">{volume.name}</span>
         <div className="volume-editor-gizmo-modes">
-          {(['object', 'vertex'] as const).map(mode => (
+          {(['object', 'vertex', 'edge', 'face'] as const).map(mode => (
             <button
               key={mode}
               className={`volume-editor-mode-btn${volumeEditMode === mode ? ' active' : ''}`}
               onClick={() => dispatch({ type: 'volume:editModeSet', mode })}
             >
-              {mode.charAt(0).toUpperCase() + mode.slice(1)} Mode
+              {mode.charAt(0).toUpperCase() + mode.slice(1)}
             </button>
           ))}
         </div>
