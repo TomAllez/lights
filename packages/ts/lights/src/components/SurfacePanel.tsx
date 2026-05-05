@@ -15,7 +15,7 @@ const SHAPE_TYPES: VolumeShapeType[] = ['box', 'sphere', 'cylinder', 'cone', 'gr
  */
 export default function SurfacePanel() {
   const { state, dispatch } = useProject()
-  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, surfaceMode, volumeEditorMode, selectedShapeId } = state
+  const { project, selectedSlideId, selectedSurfaceId, selectedLayerId, editorMode, selectedShapeId } = state
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 
@@ -36,7 +36,7 @@ export default function SurfacePanel() {
   const surface = surfaces.find(s => s.id === selectedSurfaceId)
 
   // ── Surface mode: layer panel ─────────────────────────────────────────────
-  if (surfaceMode && surface && selectedSlideId) {
+  if (editorMode === 'surface' && surface && selectedSlideId) {
     const selectedLayer = surface.layers.find(l => l.id === selectedLayerId)
     const solidLayer = selectedLayer?.type === 'solid' ? (selectedLayer as SolidLayer) : undefined
     const textLayer = selectedLayer?.type === 'text' ? (selectedLayer as TextLayer) : undefined
@@ -126,20 +126,32 @@ export default function SurfacePanel() {
     )
   }
 
-  // ── Volume editor mode: shape list ───────────────────────────────────────
-  if (volumeEditorMode && slide?.volume && selectedSlideId) {
+  // ── Volume editor mode: shape list & properties ──────────────────────────
+  if (editorMode === 'volume-editor' && slide?.volume && selectedSlideId) {
     const shapes = slide.volume.shapes
+    const selectedShape = shapes.find(s => s.id === selectedShapeId)
+
+    const updateShape = (patch: Partial<import('../model/types').VolumeShape>) => {
+      if (selectedShape && selectedSlideId) {
+        dispatch({
+          type: 'volume:shapeUpdate',
+          slideId: selectedSlideId,
+          shape: { ...selectedShape, ...patch }
+        })
+      }
+    }
+
     return (
       <aside className="surface-panel">
         <div className="surface-panel-header">
           <span>Shapes</span>
         </div>
 
-        {shapes.length === 0 ? (
-          <p className="panel-empty">No shapes</p>
-        ) : (
-          <div className="surface-list">
-            {shapes.map(sh => (
+        <div className="surface-list" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+          {shapes.length === 0 ? (
+            <p className="panel-empty">No shapes</p>
+          ) : (
+            shapes.map(sh => (
               <div
                 key={sh.id}
                 className={`surface-item${sh.id === selectedShapeId ? ' selected' : ''}`}
@@ -157,7 +169,66 @@ export default function SurfacePanel() {
                   ×
                 </button>
               </div>
-            ))}
+            ))
+          )}
+        </div>
+
+        {selectedShape && (
+          <div className="shape-properties" style={{ padding: '10px', borderTop: '1px solid #333' }}>
+            <div className="surface-panel-header" style={{ padding: '0 0 10px 0' }}>
+              <span>Properties</span>
+            </div>
+            
+            <div className="property-group">
+              <label>Position</label>
+              <div className="xyz-row">
+                {(['x', 'y', 'z'] as const).map(axis => (
+                  <div key={axis}>
+                    <span>{axis.toUpperCase()}</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={selectedShape.position[axis]}
+                      onChange={e => updateShape({ position: { ...selectedShape.position, [axis]: Number(e.target.value) } })}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="property-group">
+              <label>Rotation</label>
+              <div className="xyz-row">
+                {(['x', 'y', 'z'] as const).map(axis => (
+                  <div key={axis}>
+                    <span>{axis.toUpperCase()}</span>
+                    <input
+                      type="number"
+                      step="1"
+                      value={selectedShape.rotation[axis]}
+                      onChange={e => updateShape({ rotation: { ...selectedShape.rotation, [axis]: Number(e.target.value) } })}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="property-group">
+              <label>Scale</label>
+              <div className="xyz-row">
+                {(['x', 'y', 'z'] as const).map(axis => (
+                  <div key={axis}>
+                    <span>{axis.toUpperCase()}</span>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={selectedShape.scale[axis]}
+                      onChange={e => updateShape({ scale: { ...selectedShape.scale, [axis]: Number(e.target.value) } })}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

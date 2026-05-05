@@ -14,7 +14,7 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "io",
+    "name": "@lights/io",
     "targets": {
       "lint": {
         "executor": "@nx/eslint:lint",

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProject } from '../model/ProjectContext';
-import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces } from '../shaders/homography';
-import { buildShapeMesh, disposeShapeMesh } from '../shaders/volumeScene';
+import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
 import type { Hand, Landmark } from './canvas/landmarks';
 import {
   decodeFacemesh,

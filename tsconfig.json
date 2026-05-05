@@ -17,16 +17,19 @@
       "path": "./lib/driver"
     },
     {
-      "path": "./packages/ts/driver-ffmpeg"
+      "path": "./packages/ts/modules/driver-ffmpeg"
     },
     {
       "path": "./lib/renderer"
     },
     {
-      "path": "./packages/ts/renderer-websocket"
+      "path": "./packages/ts/modules/renderer-websocket"
     },
     {
-      "path": "./packages/ts/python-module"
+      "path": "./packages/ts/modules/python-module"
+    },
+    {
+      "path": "./lib/three-scene"
     }
   ]
 }

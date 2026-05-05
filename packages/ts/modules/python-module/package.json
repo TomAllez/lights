@@ -1,5 +1,5 @@
 {
-  "name": "@lights/renderer-websocket",
+  "name": "@lights/python-module",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -14,11 +14,10 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "renderer-websocket"
+    "name": "@lights/python-module"
   },
   "dependencies": {
-    "@lights/renderer": "*",
-    "@lights/io": "*",
-    "ws": "*"
+    "@lights/module": "*",
+    "@lights/io": "*"
   }
 }

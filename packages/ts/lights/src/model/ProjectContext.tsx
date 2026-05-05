@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera } from './types'
+import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera, VolumeEditMode } from './types'
+
+export type EditorMode = 'stage' | 'surface' | 'volume-align' | 'volume-editor'
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -9,9 +11,8 @@ export interface ProjectState {
   selectedSlideId: string | null
   selectedSurfaceId: string | null
   selectedLayerId: string | null
-  surfaceMode: boolean       // true = flat local editor open
-  volumeAlignMode: boolean   // true = camera alignment HUD active
-  volumeEditorMode: boolean  // true = 3D volume editor open
+  editorMode: EditorMode
+  volumeEditMode: VolumeEditMode
   selectedShapeId: string | null
   isDirty: boolean
   currentFilePath: string | null
@@ -22,9 +23,8 @@ const initial: ProjectState = {
   selectedSlideId: null,
   selectedSurfaceId: null,
   selectedLayerId: null,
-  surfaceMode: false,
-  volumeAlignMode: false,
-  volumeEditorMode: false,
+  editorMode: 'stage',
+  volumeEditMode: 'object',
   selectedShapeId: null,
   isDirty: false,
   currentFilePath: null,
@@ -69,8 +69,9 @@ export type ProjectAction =
   | { type: 'volume:shapeRemove'; slideId: string; shapeId: string }
   | { type: 'volume:shapeUpdate'; slideId: string; shape: import('./types').VolumeShape }
   | { type: 'volume:shapeSelect'; shapeId: string | null }
+  | { type: 'volume:editModeSet'; mode: VolumeEditMode }
 
-// ── Reducer ──────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function patchSurfaceLayers(
   state: ProjectState,
@@ -91,31 +92,15 @@ function patchSurfaceLayers(
   }
 }
 
-function reducer(state: ProjectState, action: ProjectAction): ProjectState {
-  // Project-level actions that manage dirty/path themselves
-  if (action.type === 'project:load') {
-    return {
-      ...initial,
-      project: action.project,
-      currentFilePath: action.filePath,
-      selectedSlideId: action.project.slides[0]?.id ?? null,
-    }
-  }
-  if (action.type === 'project:saved') {
-    return { ...state, isDirty: false, currentFilePath: action.filePath }
-  }
-  if (action.type === 'project:new') {
-    return { ...initial }
-  }
+// ── Sub-reducers ──────────────────────────────────────────────────────────────
 
-  const next = projectMutationReducer(state, action)
-  // Auto-mark dirty whenever the project object reference changes
-  return next.project !== state.project ? { ...next, isDirty: true } : next
-}
+type SlideAction   = Extract<ProjectAction, { type: `slide:${string}` }>
+type SurfaceAction = Extract<ProjectAction, { type: `surface:${string}` }>
+type LayerAction   = Extract<ProjectAction, { type: `layer:${string}` }>
+type VolumeAction  = Extract<ProjectAction, { type: `volume:${string}` }>
 
-function projectMutationReducer(state: ProjectState, action: ProjectAction): ProjectState {
+function applySlideAction(state: ProjectState, action: SlideAction): ProjectState {
   const { project } = state
-
   switch (action.type) {
     case 'slide:add': {
       const slide: Slide = {
@@ -129,7 +114,7 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
         project: { ...project, slides: [...project.slides, slide] },
         selectedSlideId: slide.id,
         selectedSurfaceId: null,
-        surfaceMode: false,
+        editorMode: 'stage',
       }
     }
 
@@ -153,7 +138,7 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
         project: { ...project, slides },
         selectedSlideId: copy.id,
         selectedSurfaceId: null,
-        surfaceMode: false,
+        editorMode: 'stage',
       }
     }
 
@@ -168,13 +153,39 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
         project: { ...project, slides },
         selectedSlideId,
         selectedSurfaceId: null,
-        surfaceMode: false,
+        editorMode: 'stage',
       }
     }
 
     case 'slide:select':
-      return { ...state, selectedSlideId: action.slideId, selectedSurfaceId: null, selectedLayerId: null, surfaceMode: false }
+      return { ...state, selectedSlideId: action.slideId, selectedSurfaceId: null, selectedLayerId: null, editorMode: 'stage' }
 
+    case 'slide:rename':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, name: action.name } : s),
+        },
+      }
+
+    case 'slide:updateGraphConfig':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, graphConfig: action.config } : s),
+        },
+      }
+
+    default:
+      return state
+  }
+}
+
+function applySurfaceAction(state: ProjectState, action: SurfaceAction): ProjectState {
+  const { project } = state
+  switch (action.type) {
     case 'surface:add': {
       const surface: Surface = {
         id: crypto.randomUUID(),
@@ -238,20 +249,41 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
           ),
         },
         selectedSurfaceId,
-        surfaceMode: selectedSurfaceId === null ? false : state.surfaceMode,
+        editorMode: selectedSurfaceId === null ? 'stage' : state.editorMode,
       }
     }
 
     case 'surface:select':
-      return { ...state, selectedSurfaceId: action.surfaceId, selectedLayerId: null, surfaceMode: false }
+      return { ...state, selectedSurfaceId: action.surfaceId, selectedLayerId: null, editorMode: 'stage' }
 
     case 'surface:enter':
       if (!state.selectedSurfaceId) return state
-      return { ...state, surfaceMode: true }
+      return { ...state, editorMode: 'surface' }
 
     case 'surface:exit':
-      return { ...state, surfaceMode: false, selectedLayerId: null }
+      return { ...state, editorMode: 'stage', selectedLayerId: null }
 
+    case 'surface:rename':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId
+              ? { ...s, surfaces: s.surfaces.map(sf => sf.id === action.surfaceId ? { ...sf, name: action.name } : sf) }
+              : s
+          ),
+        },
+      }
+
+    default:
+      return state
+  }
+}
+
+function applyLayerAction(state: ProjectState, action: LayerAction): ProjectState {
+  const { project } = state
+  switch (action.type) {
     case 'layer:add': {
       const slide = project.slides.find(s => s.id === action.slideId)
       const surface = slide?.surfaces.find(sf => sf.id === action.surfaceId)
@@ -337,20 +369,67 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
         layers.map(l => l.id === action.layerId ? { ...l, visible: !l.visible } : l)
       )
 
-    case 'slide:updateGraphConfig':
+    default:
+      return state
+  }
+}
+
+function applyVolumeAction(state: ProjectState, action: VolumeAction): ProjectState {
+  const { project } = state
+  switch (action.type) {
+    case 'volume:add': {
+      const volume: Volume = {
+        id: crypto.randomUUID(),
+        name: 'Volume',
+        camera: {
+          position: { x: 0, y: 2, z: 5 },
+          target: { x: 0, y: 0, z: 0 },
+          fov: 50,
+        },
+        shapes: [],
+      }
       return {
         ...state,
         project: {
           ...project,
-          slides: project.slides.map(s => s.id === action.slideId ? { ...s, graphConfig: action.config } : s),
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, volume } : s),
+        },
+      }
+    }
+
+    case 'volume:remove':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s => s.id === action.slideId ? { ...s, volume: undefined } : s),
+        },
+      }
+
+    case 'volume:alignStart':
+      return { ...state, editorMode: 'volume-align' }
+
+    case 'volume:alignDone':
+      return { ...state, editorMode: 'stage' }
+
+    case 'volume:updateCamera':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId && s.volume
+              ? { ...s, volume: { ...s.volume, camera: action.camera } }
+              : s
+          ),
         },
       }
 
     case 'volume:editorEnter':
-      return { ...state, volumeEditorMode: true, volumeAlignMode: false, surfaceMode: false, selectedShapeId: null }
+      return { ...state, editorMode: 'volume-editor', selectedShapeId: null }
 
     case 'volume:editorExit':
-      return { ...state, volumeEditorMode: false, selectedShapeId: null }
+      return { ...state, editorMode: 'stage', selectedShapeId: null }
 
     case 'volume:shapeAdd': {
       const slide = project.slides.find(s => s.id === action.slideId)
@@ -410,80 +489,42 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
 
     case 'volume:shapeSelect':
       return { ...state, selectedShapeId: action.shapeId }
-
-    case 'volume:alignStart':
-      return { ...state, volumeAlignMode: true, surfaceMode: false }
-
-    case 'volume:alignDone':
-      return { ...state, volumeAlignMode: false }
-
-    case 'volume:updateCamera':
-      return {
-        ...state,
-        project: {
-          ...project,
-          slides: project.slides.map(s =>
-            s.id === action.slideId && s.volume
-              ? { ...s, volume: { ...s.volume, camera: action.camera } }
-              : s
-          ),
-        },
-      }
-
-    case 'volume:add': {
-      const volume: Volume = {
-        id: crypto.randomUUID(),
-        name: 'Volume',
-        camera: {
-          position: { x: 0, y: 2, z: 5 },
-          target: { x: 0, y: 0, z: 0 },
-          fov: 50,
-        },
-        shapes: [],
-      }
-      return {
-        ...state,
-        project: {
-          ...project,
-          slides: project.slides.map(s => s.id === action.slideId ? { ...s, volume } : s),
-        },
-      }
-    }
-
-    case 'volume:remove':
-      return {
-        ...state,
-        project: {
-          ...project,
-          slides: project.slides.map(s => s.id === action.slideId ? { ...s, volume: undefined } : s),
-        },
-      }
-
-    case 'slide:rename':
-      return {
-        ...state,
-        project: {
-          ...project,
-          slides: project.slides.map(s => s.id === action.slideId ? { ...s, name: action.name } : s),
-        },
-      }
-
-    case 'surface:rename':
-      return {
-        ...state,
-        project: {
-          ...project,
-          slides: project.slides.map(s =>
-            s.id === action.slideId
-              ? { ...s, surfaces: s.surfaces.map(sf => sf.id === action.surfaceId ? { ...sf, name: action.name } : sf) }
-              : s
-          ),
-        },
-      }
+    case 'volume:editModeSet':
+      return { ...state, volumeEditMode: action.mode }
 
     default:
       return state
   }
+}
+
+// ── Reducer ──────────────────────────────────────────────────────────────────
+
+function projectMutationReducer(state: ProjectState, action: ProjectAction): ProjectState {
+  if (action.type.startsWith('slide:'))   return applySlideAction(state,   action as SlideAction)
+  if (action.type.startsWith('surface:')) return applySurfaceAction(state, action as SurfaceAction)
+  if (action.type.startsWith('layer:'))   return applyLayerAction(state,   action as LayerAction)
+  if (action.type.startsWith('volume:'))  return applyVolumeAction(state,  action as VolumeAction)
+  return state
+}
+
+function reducer(state: ProjectState, action: ProjectAction): ProjectState {
+  if (action.type === 'project:load') {
+    return {
+      ...initial,
+      project: action.project,
+      currentFilePath: action.filePath,
+      selectedSlideId: action.project.slides[0]?.id ?? null,
+    }
+  }
+  if (action.type === 'project:saved') {
+    return { ...state, isDirty: false, currentFilePath: action.filePath }
+  }
+  if (action.type === 'project:new') {
+    return { ...initial }
+  }
+
+  const next = projectMutationReducer(state, action)
+  return next.project !== state.project ? { ...next, isDirty: true } : next
 }
 
 // ── Context ──────────────────────────────────────────────────────────────────
@@ -507,25 +548,21 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     window.lights.sendSlide(slide)
   }, [state.selectedSlideId, state.project.slides])
 
-  // Notify main of dirty state for close confirmation
   useEffect(() => {
     window.lights.notifyDirty(state.isDirty)
   }, [state.isDirty])
 
-  // Wire up File menu events from the main process
   useEffect(() => {
     const save = async () => {
       const result = await window.lights.saveProject(stateRef.current.project)
       if (result) dispatch({ type: 'project:saved', filePath: result.filePath })
     }
 
-    const offSave = window.lights.onMenuSave(save)
-
-    const offSaveAs = window.lights.onMenuSaveAs(async () => {
+    const offSave        = window.lights.onMenuSave(save)
+    const offSaveAs      = window.lights.onMenuSaveAs(async () => {
       const result = await window.lights.saveProjectAs(stateRef.current.project)
       if (result) dispatch({ type: 'project:saved', filePath: result.filePath })
     })
-
     const offSaveAndQuit = window.lights.onMenuSaveAndQuit(async () => {
       const result = await window.lights.saveProject(stateRef.current.project)
       if (result) {
@@ -533,12 +570,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         window.lights.confirmQuit()
       }
     })
-
-    const offOpened = window.lights.onProjectOpened(({ project, filePath }) => {
+    const offOpened      = window.lights.onProjectOpened(({ project, filePath }) => {
       dispatch({ type: 'project:load', project: project as Project, filePath })
     })
-
-    const offNew = window.lights.onMenuNew(() => {
+    const offNew         = window.lights.onMenuNew(() => {
       if (stateRef.current.isDirty && !window.confirm('Discard unsaved changes?')) return
       dispatch({ type: 'project:new' })
     })

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { VolumeShape } from '../model/types'
+import type { VolumeShape } from './types'
 
 function buildCalibrationGridMaterial(): THREE.MeshBasicMaterial {
   const px = 512
@@ -39,7 +39,7 @@ function buildCalibrationGridMaterial(): THREE.MeshBasicMaterial {
 }
 
 export function buildShapeMesh(shape: VolumeShape): THREE.Mesh {
-  let geo: THREE.BufferGeometry
+  let geo: THREE.BufferGeometry | undefined
   let mat: THREE.Material
 
   if (shape.type === 'grid') {
@@ -56,7 +56,29 @@ export function buildShapeMesh(shape: VolumeShape): THREE.Mesh {
     mat = new THREE.MeshNormalMaterial()
   }
 
+  if (!geo) {
+    geo = new THREE.BufferGeometry()
+  }
+
   const mesh = new THREE.Mesh(geo, mat)
+  mesh.userData.type = shape.type
+
+  if (shape.vertices && shape.vertices.length > 0) {
+    const posAttr = geo.getAttribute('position') as THREE.BufferAttribute
+    
+    // If we have custom indices, we might need a non-indexed geometry or update index
+    if (shape.indices && shape.indices.length > 0) {
+      geo.setIndex(shape.indices)
+    }
+
+    const count = Math.min(posAttr.count, shape.vertices.length / 3)
+    for (let i = 0; i < count; i++) {
+      posAttr.setXYZ(i, shape.vertices[i * 3], shape.vertices[i * 3 + 1], shape.vertices[i * 3 + 2])
+    }
+    posAttr.needsUpdate = true
+    geo.computeVertexNormals()
+  }
+
   mesh.position.set(shape.position.x, shape.position.y, shape.position.z)
   mesh.rotation.set(
     shape.rotation.x * Math.PI / 180,

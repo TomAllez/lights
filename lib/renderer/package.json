@@ -14,7 +14,7 @@
     "./package.json": "./package.json"
   },
   "nx": {
-    "name": "renderer"
+    "name": "@lights/renderer"
   },
   "dependencies": {
     "@lights/io": "*"

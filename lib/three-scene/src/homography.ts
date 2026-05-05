@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ImageLayer, SolidLayer, Surface, TextLayer } from '../model/types'
+import type { ImageLayer, SolidLayer, Surface, TextLayer, Layer, Point } from './types'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ export async function preloadSurfaces(surfaces: Surface[]): Promise<void> {
 const TEX_SIZE = 512
 
 function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
-  const visibleLayers = surface.layers.filter(l => l.visible)
+  const visibleLayers = surface.layers.filter((l: Layer) => l.visible)
   if (visibleLayers.length === 0) return null
 
   const canvas = document.createElement('canvas')
@@ -149,7 +149,7 @@ function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
       const lines = tl.content.split('\n')
       const lineH = scaledSize * 1.2
       const totalH = lines.length * lineH
-      lines.forEach((line, i) => {
+      lines.forEach((line: string, i: number) => {
         const y = -totalH / 2 + i * lineH + lineH / 2
         ctx.fillText(line, 0, y, boxW)
       })
@@ -176,7 +176,7 @@ const COLORS: [number, number, number][] = [
 
 export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh {
   // Convert normalized stage [0,1] coords to NDC [-1,1]; flip Y (stage Y↓, NDC Y↑)
-  const dst: [number, number][] = surface.outputPolygon.map(p => [
+  const dst: [number, number][] = surface.outputPolygon.map((p: Point) => [
     p.x * 2 - 1,
     1 - p.y * 2,
   ])
