@@ -12,7 +12,6 @@
     {
       "path": "./lib/module"
     },
-    {},
     {
       "path": "./lib/driver"
     },
@@ -21,9 +20,6 @@
     },
     {
       "path": "./lib/renderer"
-    },
-    {
-      "path": "./packages/ts/modules/renderer-websocket"
     },
     {
       "path": "./packages/ts/modules/python-module"
