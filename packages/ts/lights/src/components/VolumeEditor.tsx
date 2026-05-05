@@ -161,7 +161,6 @@ export default function VolumeEditor() {
       renderer.dispose()
       container.removeChild(renderer.domElement)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Sync shapes from state → scene ───────────────────────────────────────
@@ -188,7 +187,6 @@ export default function VolumeEditor() {
     const sel = selectedShapeId ? meshMapRef.current.get(selectedShapeId) : undefined
     if (sel) transform.attach(sel)
     else transform.detach()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [volume?.shapes])
 
   // ── Sync selected shape → TransformControls ───────────────────────────────
