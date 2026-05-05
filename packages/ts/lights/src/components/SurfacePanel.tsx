@@ -211,6 +211,13 @@ export default function SurfacePanel() {
           <div className="surface-item">
             <span className="surface-name">{slide.volume.name}</span>
             <button
+              className="icon-btn"
+              title="Align camera"
+              onClick={() => dispatch({ type: 'volume:alignStart' })}
+            >
+              ⊹
+            </button>
+            <button
               className="icon-btn surface-remove"
               title="Remove volume"
               onClick={e => {
