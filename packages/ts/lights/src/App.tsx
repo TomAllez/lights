@@ -8,13 +8,14 @@ import {
   SurfaceCanvas,
   SurfacePanel,
   VolumeAlignHUD,
+  VolumeEditor,
 } from './components';
 import { useGraph, useProject } from './model';
 
 export default function App() {
   const { status } = useGraph();
   const {
-    state: { surfaceMode, volumeAlignMode },
+    state: { surfaceMode, volumeAlignMode, volumeEditorMode },
   } = useProject();
   const [showVideo, setShowVideo] = useState(true);
 
@@ -23,7 +24,9 @@ export default function App() {
     <div className="app">
       <SlidePanel />
       <div className="stage-area">
-        {surfaceMode ? (
+        {volumeEditorMode ? (
+          <VolumeEditor />
+        ) : surfaceMode ? (
           <SurfaceCanvas />
         ) : (
           <div className="stage-canvas">
@@ -31,7 +34,7 @@ export default function App() {
             {volumeAlignMode ? <VolumeAlignHUD /> : <StageOverlay />}
           </div>
         )}
-        {!surfaceMode && (
+        {!surfaceMode && !volumeEditorMode && (
           <button
             className={`canvas-video-toggle${showVideo ? '' : ' off'}`}
             title={showVideo ? 'Hide video' : 'Show video'}

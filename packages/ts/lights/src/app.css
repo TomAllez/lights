@@ -764,6 +764,56 @@ body,
   text-transform: uppercase;
 }
 
+/* ── Volume editor ───────────────────────────────────────────────────────── */
+
+.volume-editor-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(10, 10, 10, 0.8);
+  border: 1px solid #222;
+  border-radius: 6px;
+  padding: 6px 10px;
+  backdrop-filter: blur(6px);
+}
+
+.volume-editor-title {
+  font-size: 11px;
+  color: #666;
+}
+
+.volume-editor-projector-btn {
+  background: none;
+  border: 1px solid #2a2a2a;
+  color: #555;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.volume-editor-projector-btn:hover {
+  border-color: #444;
+  color: #ccc;
+}
+
+.volume-shape-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+}
+
+.volume-shape-btn {
+  width: auto !important;
+  padding: 0 8px;
+  font-size: 10px;
+  text-transform: capitalize;
+}
+
 /* ── Volume alignment HUD ────────────────────────────────────────────────── */
 
 .volume-align-hud {

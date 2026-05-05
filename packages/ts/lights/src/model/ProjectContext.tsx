@@ -9,8 +9,10 @@ export interface ProjectState {
   selectedSlideId: string | null
   selectedSurfaceId: string | null
   selectedLayerId: string | null
-  surfaceMode: boolean      // true = flat local editor open
-  volumeAlignMode: boolean  // true = camera alignment HUD active
+  surfaceMode: boolean       // true = flat local editor open
+  volumeAlignMode: boolean   // true = camera alignment HUD active
+  volumeEditorMode: boolean  // true = 3D volume editor open
+  selectedShapeId: string | null
   isDirty: boolean
   currentFilePath: string | null
 }
@@ -22,6 +24,8 @@ const initial: ProjectState = {
   selectedLayerId: null,
   surfaceMode: false,
   volumeAlignMode: false,
+  volumeEditorMode: false,
+  selectedShapeId: null,
   isDirty: false,
   currentFilePath: null,
 }
@@ -59,6 +63,12 @@ export type ProjectAction =
   | { type: 'volume:alignStart' }
   | { type: 'volume:alignDone' }
   | { type: 'volume:updateCamera'; slideId: string; camera: VolumeCamera }
+  | { type: 'volume:editorEnter' }
+  | { type: 'volume:editorExit' }
+  | { type: 'volume:shapeAdd'; slideId: string; shapeType: import('./types').VolumeShapeType }
+  | { type: 'volume:shapeRemove'; slideId: string; shapeId: string }
+  | { type: 'volume:shapeUpdate'; slideId: string; shape: import('./types').VolumeShape }
+  | { type: 'volume:shapeSelect'; shapeId: string | null }
 
 // ── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -335,6 +345,71 @@ function projectMutationReducer(state: ProjectState, action: ProjectAction): Pro
           slides: project.slides.map(s => s.id === action.slideId ? { ...s, graphConfig: action.config } : s),
         },
       }
+
+    case 'volume:editorEnter':
+      return { ...state, volumeEditorMode: true, volumeAlignMode: false, surfaceMode: false, selectedShapeId: null }
+
+    case 'volume:editorExit':
+      return { ...state, volumeEditorMode: false, selectedShapeId: null }
+
+    case 'volume:shapeAdd': {
+      const slide = project.slides.find(s => s.id === action.slideId)
+      if (!slide?.volume) return state
+      const shape: import('./types').VolumeShape = {
+        id: crypto.randomUUID(),
+        name: `${action.shapeType.charAt(0).toUpperCase() + action.shapeType.slice(1)} ${slide.volume.shapes.length + 1}`,
+        type: action.shapeType,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        scale: { x: 1, y: 1, z: 1 },
+        layers: [],
+        reactions: [],
+      }
+      return {
+        ...state,
+        selectedShapeId: shape.id,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId && s.volume
+              ? { ...s, volume: { ...s.volume, shapes: [...s.volume.shapes, shape] } }
+              : s
+          ),
+        },
+      }
+    }
+
+    case 'volume:shapeRemove': {
+      const newSelected = state.selectedShapeId === action.shapeId ? null : state.selectedShapeId
+      return {
+        ...state,
+        selectedShapeId: newSelected,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId && s.volume
+              ? { ...s, volume: { ...s.volume, shapes: s.volume.shapes.filter(sh => sh.id !== action.shapeId) } }
+              : s
+          ),
+        },
+      }
+    }
+
+    case 'volume:shapeUpdate':
+      return {
+        ...state,
+        project: {
+          ...project,
+          slides: project.slides.map(s =>
+            s.id === action.slideId && s.volume
+              ? { ...s, volume: { ...s.volume, shapes: s.volume.shapes.map(sh => sh.id === action.shape.id ? action.shape : sh) } }
+              : s
+          ),
+        },
+      }
+
+    case 'volume:shapeSelect':
+      return { ...state, selectedShapeId: action.shapeId }
 
     case 'volume:alignStart':
       return { ...state, volumeAlignMode: true, surfaceMode: false }
