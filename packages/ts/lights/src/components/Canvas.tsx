@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProject } from '../model/ProjectContext';
-import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
+import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh, buildShaderLayerMeshes, disposeShaderLayerMesh } from '@lights/three-scene';
 import type { Hand, Landmark } from './canvas/landmarks';
 import {
   decodeFacemesh,
@@ -20,8 +20,11 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
-  const volumeGroupRef = useRef<THREE.Group | null>(null);
+  const shaderGroupRef  = useRef<THREE.Group | null>(null);
+  const volumeGroupRef  = useRef<THREE.Group | null>(null);
   const volumeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const startAnimRef    = useRef<() => void>(() => {});
+  const stopAnimRef     = useRef<() => void>(() => {});
 
   const showVideoRef = useRef(showVideo);
   showVideoRef.current = showVideo;
@@ -70,6 +73,26 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     const surfaceGroup = new THREE.Group();
     scene.add(surfaceGroup);
     surfaceGroupRef.current = surfaceGroup;
+
+    const shaderGroup = new THREE.Group();
+    scene.add(shaderGroup);
+    shaderGroupRef.current = shaderGroup;
+
+    // rAF loop — runs only while shader layers are present on the active slide
+    let animId: number | null = null;
+    const t0 = performance.now();
+    function tick() {
+      const t = (performance.now() - t0) / 1000;
+      shaderGroup.traverse(obj => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        const mat = obj.material as THREE.ShaderMaterial;
+        if (mat.uniforms?.uTime) mat.uniforms.uTime.value = t;
+      });
+      render();
+      animId = requestAnimationFrame(tick);
+    }
+    startAnimRef.current = () => { if (animId === null) animId = requestAnimationFrame(tick); };
+    stopAnimRef.current  = () => { if (animId !== null) { cancelAnimationFrame(animId); animId = null; } };
 
     const volumeScene = new THREE.Scene();
     const volumeCamera = new THREE.PerspectiveCamera(
@@ -184,6 +207,7 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     observer.observe(container);
 
     return () => {
+      stopAnimRef.current();
       off();
       observer.disconnect();
       if (handsExpiry) clearTimeout(handsExpiry);
@@ -223,22 +247,34 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
 
   // ── Surface meshes (rebuilt whenever the active slide's surfaces change) ──
   useEffect(() => {
-    const group = surfaceGroupRef.current;
-    if (!group) return;
+    const group       = surfaceGroupRef.current;
+    const shaderGroup = shaderGroupRef.current;
+    if (!group || !shaderGroup) return;
 
     let cancelled = false;
+
+    // Clear shader meshes immediately so stale ones don't linger during preload
+    shaderGroup.traverse(obj => { if (obj instanceof THREE.Mesh) disposeShaderLayerMesh(obj); });
+    shaderGroup.clear();
+
     preloadSurfaces(surfaces).then(() => {
       if (cancelled) return;
       surfaces.forEach((surface, i) => group.add(buildSurfaceMesh(surface, i)));
-      renderRef.current();
+      for (const surface of surfaces) {
+        for (const mesh of buildShaderLayerMeshes(surface)) shaderGroup.add(mesh);
+      }
+      const hasShaders = surfaces.some(s => s.layers.some(l => l.type === 'shader' && l.visible));
+      if (hasShaders) startAnimRef.current();
+      else { stopAnimRef.current(); renderRef.current(); }
     });
 
     return () => {
       cancelled = true;
-      group.traverse((child) => {
-        if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
-      });
+      group.traverse((child) => { if (child instanceof THREE.Mesh) disposeSurfaceMesh(child); });
       group.clear();
+      shaderGroup.traverse(obj => { if (obj instanceof THREE.Mesh) disposeShaderLayerMesh(obj); });
+      shaderGroup.clear();
+      stopAnimRef.current();
     };
   }, [surfaces]);
 

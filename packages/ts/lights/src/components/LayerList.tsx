@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../model/types'
+import type { ImageLayer, Layer, ShaderLayer, SolidLayer, TextLayer } from '../model/types'
 
 interface LayerListProps {
   surface: { layers: Layer[] }
@@ -90,6 +90,9 @@ export default function LayerList({
               )}
               {layer.type === 'text' && (
                 <span className="layer-text-badge" style={{ color: (layer as TextLayer).color }}>T</span>
+              )}
+              {layer.type === 'shader' && (
+                <span className="layer-text-badge" style={{ color: '#7c6af7' }}>{(layer as ShaderLayer).preset[0].toUpperCase()}</span>
               )}
               <button
                 className="icon-btn layer-remove"

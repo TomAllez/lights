@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useProject } from '../model/ProjectContext'
-import type { SolidLayer, TextLayer, VolumeShapeType } from '../model/types'
+import type { ShaderLayer, ShaderPreset, SolidLayer, TextLayer, VolumeShapeType } from '../model/types'
 import LayerList from './LayerList'
 import GraphConfigPanel from './GraphConfigPanel'
 
@@ -38,8 +38,9 @@ export default function SurfacePanel() {
   // ── Surface mode: layer panel ─────────────────────────────────────────────
   if (editorMode === 'surface' && surface && selectedSlideId) {
     const selectedLayer = surface.layers.find(l => l.id === selectedLayerId)
-    const solidLayer = selectedLayer?.type === 'solid' ? (selectedLayer as SolidLayer) : undefined
-    const textLayer = selectedLayer?.type === 'text' ? (selectedLayer as TextLayer) : undefined
+    const solidLayer  = selectedLayer?.type === 'solid'  ? (selectedLayer as SolidLayer)  : undefined
+    const textLayer   = selectedLayer?.type === 'text'   ? (selectedLayer as TextLayer)   : undefined
+    const shaderLayer = selectedLayer?.type === 'shader' ? (selectedLayer as ShaderLayer) : undefined
 
     function removeLayer(layerId: string) {
       dispatch({ type: 'layer:remove', slideId: selectedSlideId!, surfaceId: surface!.id, layerId })
@@ -93,6 +94,20 @@ export default function SurfacePanel() {
               value={solidLayer.color}
               onChange={e => dispatch({ type: 'layer:update', slideId: selectedSlideId!, surfaceId: surface!.id, layer: { ...solidLayer, color: e.target.value } })}
             />
+          </div>
+        )}
+
+        {shaderLayer && (
+          <div className="surface-editor">
+            <label className="surface-editor-label">Preset</label>
+            <select
+              value={shaderLayer.preset}
+              onChange={e => dispatch({ type: 'layer:update', slideId: selectedSlideId!, surfaceId: surface!.id, layer: { ...shaderLayer, preset: e.target.value as ShaderPreset } })}
+            >
+              <option value="pulse">Pulse</option>
+              <option value="ripple">Ripple</option>
+              <option value="chromatic">Chromatic</option>
+            </select>
           </div>
         )}
 

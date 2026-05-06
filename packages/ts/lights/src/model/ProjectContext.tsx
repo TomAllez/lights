@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera, VolumeEditMode } from './types'
+import type { ImageLayer, Layer, Project, ShaderLayer, ShaderPreset, Slide, Surface, TextLayer, Volume, VolumeCamera, VolumeEditMode } from './types'
 
 export type EditorMode = 'stage' | 'surface' | 'volume-align' | 'volume-editor'
 
@@ -52,6 +52,7 @@ export type ProjectAction =
   | { type: 'layer:add'; slideId: string; surfaceId: string }
   | { type: 'layer:add-image'; slideId: string; surfaceId: string; src: string; name: string }
   | { type: 'layer:add-text'; slideId: string; surfaceId: string }
+  | { type: 'layer:add-shader'; slideId: string; surfaceId: string; preset?: ShaderPreset }
   | { type: 'layer:remove'; slideId: string; surfaceId: string; layerId: string }
   | { type: 'layer:update'; slideId: string; surfaceId: string; layer: Layer }
   | { type: 'layer:reorder'; slideId: string; surfaceId: string; layerIds: string[] }
@@ -332,6 +333,25 @@ function applyLayerAction(state: ProjectState, action: LayerAction): ProjectStat
         name: action.name,
         visible: true,
         src: action.src,
+        transform: { x: 0.5, y: 0.5, w: 1.0, h: 1.0, rotation: 0 },
+      }
+      return {
+        ...patchSurfaceLayers(state, action.slideId, action.surfaceId, layers => [layer, ...layers]),
+        selectedLayerId: layer.id,
+      }
+    }
+
+    case 'layer:add-shader': {
+      const slide = project.slides.find(s => s.id === action.slideId)
+      const surface = slide?.surfaces.find(sf => sf.id === action.surfaceId)
+      if (!surface) return state
+      const layer: ShaderLayer = {
+        id: crypto.randomUUID(),
+        type: 'shader',
+        name: `Shader ${surface.layers.length + 1}`,
+        visible: true,
+        preset: action.preset ?? 'pulse',
+        uniforms: { uIntensity: 0 },
         transform: { x: 0.5, y: 0.5, w: 1.0, h: 1.0, rotation: 0 },
       }
       return {
