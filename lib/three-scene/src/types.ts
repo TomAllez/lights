@@ -41,7 +41,11 @@ export interface LayerTransform {
 export interface SolidLayer { id: string; type: 'solid'; name: string; visible: boolean; color: string; transform: LayerTransform }
 export interface ImageLayer { id: string; type: 'image'; name: string; visible: boolean; src: string; transform: LayerTransform }
 export interface TextLayer { id: string; type: 'text'; name: string; visible: boolean; content: string; fontSize: number; color: string; transform: LayerTransform }
-export type Layer = SolidLayer | ImageLayer | TextLayer
+
+export type ShaderPreset = 'pulse' | 'ripple' | 'chromatic'
+export interface ShaderLayer { id: string; type: 'shader'; name: string; visible: boolean; preset: ShaderPreset; uniforms: Record<string, number>; transform: LayerTransform }
+
+export type Layer = SolidLayer | ImageLayer | TextLayer | ShaderLayer
 
 export interface Surface {
   id: string
