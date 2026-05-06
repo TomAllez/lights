@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProject } from '../model/ProjectContext';
 import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh, buildShaderLayerMeshes, disposeShaderLayerMesh } from '@lights/three-scene';
+import { shaderBus } from '../model/shaderBus';
 import type { Hand, Landmark } from './canvas/landmarks';
 import {
   decodeFacemesh,
@@ -25,6 +26,8 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
   const volumeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const startAnimRef    = useRef<() => void>(() => {});
   const stopAnimRef     = useRef<() => void>(() => {});
+  // layerId → timestamp of last reaction trigger, for uIntensity decay
+  const triggerMapRef   = useRef(new Map<string, number>());
 
   const showVideoRef = useRef(showVideo);
   showVideoRef.current = showVideo;
@@ -79,20 +82,44 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     shaderGroupRef.current = shaderGroup;
 
     // rAF loop — runs only while shader layers are present on the active slide
+    const DECAY_MS = 600;
     let animId: number | null = null;
     const t0 = performance.now();
     function tick() {
-      const t = (performance.now() - t0) / 1000;
+      const now = performance.now();
+      const t = (now - t0) / 1000;
       shaderGroup.traverse(obj => {
         if (!(obj instanceof THREE.Mesh)) return;
         const mat = obj.material as THREE.ShaderMaterial;
         if (mat.uniforms?.uTime) mat.uniforms.uTime.value = t;
+        const layerId = obj.userData.layerId as string | undefined;
+        if (layerId && mat.uniforms?.uIntensity) {
+          const firedAt = triggerMapRef.current.get(layerId);
+          if (firedAt !== undefined) {
+            const intensity = Math.max(0, 1 - (now - firedAt) / DECAY_MS);
+            mat.uniforms.uIntensity.value = intensity;
+            if (intensity === 0) triggerMapRef.current.delete(layerId);
+          }
+        }
       });
       render();
       animId = requestAnimationFrame(tick);
     }
     startAnimRef.current = () => { if (animId === null) animId = requestAnimationFrame(tick); };
     stopAnimRef.current  = () => { if (animId !== null) { cancelAnimationFrame(animId); animId = null; } };
+
+    // Register with the shader bus so the reaction engine can drive uniforms
+    shaderBus.setUniform = (layerId, name, value) => {
+      if (name === 'uIntensity') {
+        triggerMapRef.current.set(layerId, performance.now());
+      } else {
+        shaderGroup.traverse(obj => {
+          if (!(obj instanceof THREE.Mesh) || obj.userData.layerId !== layerId) return;
+          const mat = obj.material as THREE.ShaderMaterial;
+          if (mat.uniforms[name]) mat.uniforms[name].value = value;
+        });
+      }
+    };
 
     const volumeScene = new THREE.Scene();
     const volumeCamera = new THREE.PerspectiveCamera(
@@ -208,6 +235,7 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
 
     return () => {
       stopAnimRef.current();
+      shaderBus.setUniform = () => {};
       off();
       observer.disconnect();
       if (handsExpiry) clearTimeout(handsExpiry);
