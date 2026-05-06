@@ -1,5 +1,5 @@
 import { useProject } from '../model'
-import { Square, Image as ImageIcon, Type } from 'lucide-react'
+import { Square, Image as ImageIcon, Type, Zap } from 'lucide-react'
 
 export default function LayerToolbar() {
   const { state, dispatch } = useProject()
@@ -21,6 +21,10 @@ export default function LayerToolbar() {
     dispatch({ type: 'layer:add-text', slideId: selectedSlideId!, surfaceId: selectedSurfaceId! })
   }
 
+  function addShader() {
+    dispatch({ type: 'layer:add-shader', slideId: selectedSlideId!, surfaceId: selectedSurfaceId! })
+  }
+
   return (
     <aside className="layer-toolbar">
       <button className="layer-tool-btn" title="Add solid layer" onClick={addSolid}>
@@ -31,6 +35,9 @@ export default function LayerToolbar() {
       </button>
       <button className="layer-tool-btn" title="Add text layer" onClick={addText}>
         <Type size={20} />
+      </button>
+      <button className="layer-tool-btn" title="Add shader layer" onClick={addShader}>
+        <Zap size={20} />
       </button>
     </aside>
   )

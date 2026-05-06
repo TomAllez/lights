@@ -1,4 +1,4 @@
-import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../model/types'
+import type { ImageLayer, Layer, ShaderLayer, SolidLayer, TextLayer } from '../model/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,8 +38,15 @@ export default function LayerObject({
 }: LayerObjectProps) {
   const t = layer.transform
 
-  const bgStyle: React.CSSProperties =
-    layer.type === 'solid'
+  const shaderLayer = layer.type === 'shader' ? (layer as ShaderLayer) : null
+
+  const bgStyle: React.CSSProperties = shaderLayer
+    ? {
+        background: 'repeating-linear-gradient(45deg, rgba(124,106,247,0.08) 0px, rgba(124,106,247,0.08) 8px, transparent 8px, transparent 16px)',
+        border: '1.5px dashed rgba(124,106,247,0.5)',
+        boxSizing: 'border-box',
+      }
+    : layer.type === 'solid'
       ? { background: (layer as SolidLayer).color }
       : layer.type === 'image'
         ? {
@@ -70,6 +77,11 @@ export default function LayerObject({
           style={{ color: textLayer.color, fontSize: `${textLayer.fontSize * canvasH / 500}px` }}
         >
           {textLayer.content}
+        </div>
+      )}
+      {shaderLayer && (
+        <div className="layer-text-content" style={{ color: 'rgba(124,106,247,0.7)', fontSize: 11, pointerEvents: 'none' }}>
+          ⚡ {shaderLayer.preset}
         </div>
       )}
       {isSelected && (

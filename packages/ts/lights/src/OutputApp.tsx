@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { Slide } from './model/types';
-import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
+import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh, buildShaderLayerMeshes, disposeShaderLayerMesh } from '@lights/three-scene';
 
 export default function OutputApp() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -19,6 +19,22 @@ export default function OutputApp() {
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
     const surfaceGroup = new THREE.Group();
     scene.add(surfaceGroup);
+    const shaderGroup = new THREE.Group();
+    scene.add(shaderGroup);
+
+    // rAF loop for ShaderLayer uTime animation
+    let animId: number | null = null;
+    const t0 = performance.now();
+    function tick() {
+      const t = (performance.now() - t0) / 1000;
+      shaderGroup.traverse(obj => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        const mat = obj.material as THREE.ShaderMaterial;
+        if (mat.uniforms?.uTime) mat.uniforms.uTime.value = t;
+      });
+      render();
+      animId = requestAnimationFrame(tick);
+    }
 
     // ── Volume pass (perspective) ─────────────────────────────────────────────
     const volumeScene = new THREE.Scene();
@@ -35,17 +51,19 @@ export default function OutputApp() {
 
     async function renderSlide(slide: Slide) {
       // Surfaces
-      surfaceGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
-      });
+      surfaceGroup.traverse((child) => { if (child instanceof THREE.Mesh) disposeSurfaceMesh(child); });
       surfaceGroup.clear();
+      shaderGroup.traverse((obj) => { if (obj instanceof THREE.Mesh) disposeShaderLayerMesh(obj); });
+      shaderGroup.clear();
+
       await preloadSurfaces(slide.surfaces);
       slide.surfaces.forEach((surface, i) => surfaceGroup.add(buildSurfaceMesh(surface, i)));
+      for (const surface of slide.surfaces) {
+        for (const mesh of buildShaderLayerMeshes(surface)) shaderGroup.add(mesh);
+      }
 
       // Volume
-      volumeGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) disposeShapeMesh(child as THREE.Mesh);
-      });
+      volumeGroup.traverse((child) => { if (child instanceof THREE.Mesh) disposeShapeMesh(child as THREE.Mesh); });
       volumeGroup.clear();
 
       if (slide.volume) {
@@ -57,7 +75,10 @@ export default function OutputApp() {
         for (const shape of slide.volume.shapes) volumeGroup.add(buildShapeMesh(shape));
       }
 
-      render();
+      const hasShaders = slide.surfaces.some(s => s.layers.some(l => l.type === 'shader' && l.visible));
+      if (hasShaders && animId === null) animId = requestAnimationFrame(tick);
+      else if (!hasShaders && animId !== null) { cancelAnimationFrame(animId); animId = null; render(); }
+      else if (!hasShaders) render();
     }
 
     const off = window.lights.onOutputRender((data) => {
@@ -77,14 +98,12 @@ export default function OutputApp() {
     updateLayout();
 
     return () => {
+      if (animId !== null) cancelAnimationFrame(animId);
       off();
       observer.disconnect();
-      surfaceGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
-      });
-      volumeGroup.traverse((child) => {
-        if (child instanceof THREE.Mesh) disposeShapeMesh(child as THREE.Mesh);
-      });
+      surfaceGroup.traverse((child) => { if (child instanceof THREE.Mesh) disposeSurfaceMesh(child); });
+      shaderGroup.traverse((obj) => { if (obj instanceof THREE.Mesh) disposeShaderLayerMesh(obj); });
+      volumeGroup.traverse((child) => { if (child instanceof THREE.Mesh) disposeShapeMesh(child as THREE.Mesh); });
       renderer.dispose();
       container.removeChild(renderer.domElement);
     };
