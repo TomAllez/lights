@@ -10,9 +10,10 @@ import {
   VolumeAlignHUD,
   VolumeEditor,
 } from './components';
-import { useGraph, useProject } from './model';
+import { useGraph, useProject, useReactionEngine } from './model';
 
 export default function App() {
+  useReactionEngine();
   const { status } = useGraph();
   const {
     state: { editorMode },

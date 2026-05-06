@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { useProject } from '../model/ProjectContext';
-import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
+import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh, buildShaderLayerMeshes, disposeShaderLayerMesh } from '@lights/three-scene';
+import { shaderBus } from '../model/shaderBus';
 import type { Hand, Landmark } from './canvas/landmarks';
 import {
   decodeFacemesh,
@@ -20,8 +21,13 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
-  const volumeGroupRef = useRef<THREE.Group | null>(null);
+  const shaderGroupRef  = useRef<THREE.Group | null>(null);
+  const volumeGroupRef  = useRef<THREE.Group | null>(null);
   const volumeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const startAnimRef    = useRef<() => void>(() => {});
+  const stopAnimRef     = useRef<() => void>(() => {});
+  // layerId → timestamp of last reaction trigger, for uIntensity decay
+  const triggerMapRef   = useRef(new Map<string, number>());
 
   const showVideoRef = useRef(showVideo);
   showVideoRef.current = showVideo;
@@ -70,6 +76,56 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     const surfaceGroup = new THREE.Group();
     scene.add(surfaceGroup);
     surfaceGroupRef.current = surfaceGroup;
+
+    const shaderGroup = new THREE.Group();
+    scene.add(shaderGroup);
+    shaderGroupRef.current = shaderGroup;
+
+    // rAF loop — runs only while shader layers are present on the active slide.
+    // Throttled to 30 fps: schedule every rAF but only update uniforms + render
+    // when enough time has elapsed, halving the GPU load vs the display rate.
+    const DECAY_MS = 600;
+    const SHADER_FRAME_MS = 1000 / 30;
+    let animId: number | null = null;
+    let lastShaderRender = 0;
+    const t0 = performance.now();
+    function tick(timestamp: number) {
+      animId = requestAnimationFrame(tick);
+      if (timestamp - lastShaderRender < SHADER_FRAME_MS) return;
+      lastShaderRender = timestamp;
+      const now = performance.now();
+      const t = (now - t0) / 1000;
+      shaderGroup.traverse(obj => {
+        if (!(obj instanceof THREE.Mesh)) return;
+        const mat = obj.material as THREE.ShaderMaterial;
+        if (mat.uniforms?.uTime) mat.uniforms.uTime.value = t;
+        const layerId = obj.userData.layerId as string | undefined;
+        if (layerId && mat.uniforms?.uIntensity) {
+          const firedAt = triggerMapRef.current.get(layerId);
+          if (firedAt !== undefined) {
+            const intensity = Math.max(0, 1 - (now - firedAt) / DECAY_MS);
+            mat.uniforms.uIntensity.value = intensity;
+            if (intensity === 0) triggerMapRef.current.delete(layerId);
+          }
+        }
+      });
+      render();
+    }
+    startAnimRef.current = () => { if (animId === null) animId = requestAnimationFrame(tick); };
+    stopAnimRef.current  = () => { if (animId !== null) { cancelAnimationFrame(animId); animId = null; } };
+
+    // Register with the shader bus so the reaction engine can drive uniforms
+    shaderBus.setUniform = (layerId, name, value) => {
+      if (name === 'uIntensity') {
+        triggerMapRef.current.set(layerId, performance.now());
+      } else {
+        shaderGroup.traverse(obj => {
+          if (!(obj instanceof THREE.Mesh) || obj.userData.layerId !== layerId) return;
+          const mat = obj.material as THREE.ShaderMaterial;
+          if (mat.uniforms[name]) mat.uniforms[name].value = value;
+        });
+      }
+    };
 
     const volumeScene = new THREE.Scene();
     const volumeCamera = new THREE.PerspectiveCamera(
@@ -184,6 +240,8 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     observer.observe(container);
 
     return () => {
+      stopAnimRef.current();
+      shaderBus.setUniform = () => {};
       off();
       observer.disconnect();
       if (handsExpiry) clearTimeout(handsExpiry);
@@ -223,22 +281,34 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
 
   // ── Surface meshes (rebuilt whenever the active slide's surfaces change) ──
   useEffect(() => {
-    const group = surfaceGroupRef.current;
-    if (!group) return;
+    const group       = surfaceGroupRef.current;
+    const shaderGroup = shaderGroupRef.current;
+    if (!group || !shaderGroup) return;
 
     let cancelled = false;
+
+    // Clear shader meshes immediately so stale ones don't linger during preload
+    shaderGroup.traverse(obj => { if (obj instanceof THREE.Mesh) disposeShaderLayerMesh(obj); });
+    shaderGroup.clear();
+
     preloadSurfaces(surfaces).then(() => {
       if (cancelled) return;
       surfaces.forEach((surface, i) => group.add(buildSurfaceMesh(surface, i)));
-      renderRef.current();
+      for (const surface of surfaces) {
+        for (const mesh of buildShaderLayerMeshes(surface)) shaderGroup.add(mesh);
+      }
+      const hasShaders = surfaces.some(s => s.layers.some(l => l.type === 'shader' && l.visible));
+      if (hasShaders) startAnimRef.current();
+      else { stopAnimRef.current(); renderRef.current(); }
     });
 
     return () => {
       cancelled = true;
-      group.traverse((child) => {
-        if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
-      });
+      group.traverse((child) => { if (child instanceof THREE.Mesh) disposeSurfaceMesh(child); });
       group.clear();
+      shaderGroup.traverse(obj => { if (obj instanceof THREE.Mesh) disposeShaderLayerMesh(obj); });
+      shaderGroup.clear();
+      stopAnimRef.current();
     };
   }, [surfaces]);
 

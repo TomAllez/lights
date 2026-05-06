@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ImageLayer, SolidLayer, Surface, TextLayer, Layer, Point } from './types'
+import type { ImageLayer, ShaderLayer, ShaderPreset, SolidLayer, Surface, TextLayer, Layer, Point } from './types'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,56 @@ void main() {
   gl_FragColor = texture2D(uTexture, vec2(vUv.x, 1.0 - vUv.y));
 }
 `
+
+// ── ShaderLayer presets ───────────────────────────────────────────────────────
+
+const fragmentShaderPulse = /* glsl */`
+varying vec2 vUv;
+uniform float uTime;
+uniform float uIntensity;
+void main() {
+  float wave = 0.5 + 0.5 * sin(uTime * 1.4 + vUv.x * 2.5 + vUv.y * 1.8);
+  vec3 col = vec3(0.2 + wave * 0.3, 0.3 + wave * 0.2, 0.85 + wave * 0.15);
+  float alpha = 0.3 + wave * 0.35 + uIntensity * 0.45;
+  gl_FragColor = vec4(col, min(1.0, alpha));
+}
+`
+
+const fragmentShaderRipple = /* glsl */`
+varying vec2 vUv;
+uniform float uTime;
+uniform float uIntensity;
+void main() {
+  float dist = length(vUv - vec2(0.5));
+  float speed = 1.5 + uIntensity * 5.0;
+  float ring = 0.5 + 0.5 * sin(dist * 16.0 - uTime * speed);
+  float fade = max(0.0, 1.0 - dist * 2.0);
+  float alpha = ring * fade * (0.25 + uIntensity * 0.6);
+  vec3 col = mix(vec3(0.15, 0.55, 1.0), vec3(1.0, 0.8, 0.15), uIntensity);
+  gl_FragColor = vec4(col, alpha);
+}
+`
+
+const fragmentShaderChromatic = /* glsl */`
+varying vec2 vUv;
+uniform float uTime;
+uniform float uIntensity;
+void main() {
+  vec2 c = vUv - 0.5;
+  float s = 0.012 + uIntensity * 0.06;
+  float r = 0.5 + 0.5 * sin(length(c + c * s) * 9.0 - uTime * 0.9);
+  float g = 0.5 + 0.5 * sin(length(c) * 9.0 - uTime * 0.9 + 2.094);
+  float b = 0.5 + 0.5 * sin(length(c - c * s) * 9.0 - uTime * 0.9 + 4.189);
+  float alpha = 0.45 + uIntensity * 0.35;
+  gl_FragColor = vec4(r, g, b, alpha);
+}
+`
+
+const PRESET_SHADERS: Record<ShaderPreset, string> = {
+  pulse:     fragmentShaderPulse,
+  ripple:    fragmentShaderRipple,
+  chromatic: fragmentShaderChromatic,
+}
 
 // ── Math ─────────────────────────────────────────────────────────────────────
 
@@ -106,12 +156,13 @@ export async function preloadSurfaces(surfaces: Surface[]): Promise<void> {
 
 // ── Texture compositor ────────────────────────────────────────────────────────
 
-// Composite all visible layers onto an offscreen canvas (surface local space,
-// Y-down), then wrap it in a Three.js CanvasTexture. Returns null if no layers.
+// Composite all visible non-shader layers onto an offscreen canvas (surface
+// local space, Y-down), then wrap it in a Three.js CanvasTexture. Returns null
+// if no renderable layers remain.
 const TEX_SIZE = 512
 
 function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
-  const visibleLayers = surface.layers.filter((l: Layer) => l.visible)
+  const visibleLayers = surface.layers.filter((l: Layer) => l.visible && l.type !== 'shader')
   if (visibleLayers.length === 0) return null
 
   const canvas = document.createElement('canvas')
@@ -122,7 +173,7 @@ function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
   // Render bottom-to-top: surface.layers[0] is the top layer in the panel,
   // so we iterate in reverse to draw the backmost layer first.
   for (const layer of [...surface.layers].reverse()) {
-    if (!layer.visible) continue
+    if (!layer.visible || layer.type === 'shader') continue
 
     const t = layer.transform
     ctx.save()
@@ -161,10 +212,41 @@ function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
   return new THREE.CanvasTexture(canvas)
 }
 
-// ── Mesh builder ─────────────────────────────────────────────────────────────
+// ── Geometry builder ──────────────────────────────────────────────────────────
 
 // UV corners matching outputPolygon corner order: TL, TR, BR, BL
 const SRC_UVS: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]]
+
+// Builds the homography-warped BufferGeometry for a surface. Shared by both
+// the canvas-texture mesh and per-ShaderLayer meshes.
+function buildHomographyGeo(surface: Surface): THREE.BufferGeometry {
+  // Convert normalized stage [0,1] coords to NDC [-1,1]; flip Y (stage Y↓, NDC Y↑)
+  const dst: [number, number][] = surface.outputPolygon.map((p: Point) => [
+    p.x * 2 - 1,
+    1 - p.y * 2,
+  ])
+  const H = computeHomography(SRC_UVS, dst)
+  const positions = new Float32Array(12)
+  const uvs       = new Float32Array(8)
+  const ws        = new Float32Array(4)
+  SRC_UVS.forEach(([u, v], i) => {
+    const w = H[6] * u + H[7] * v + H[8]
+    positions[i * 3]     = dst[i][0] * w
+    positions[i * 3 + 1] = dst[i][1] * w
+    positions[i * 3 + 2] = 0
+    uvs[i * 2]     = u
+    uvs[i * 2 + 1] = v
+    ws[i]          = w
+  })
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2))
+  geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
+  geo.setIndex([0, 1, 2, 0, 2, 3])
+  return geo
+}
+
+// ── Mesh builders ─────────────────────────────────────────────────────────────
 
 const COLORS: [number, number, number][] = [
   [0.38, 0.65, 0.98],
@@ -175,34 +257,7 @@ const COLORS: [number, number, number][] = [
 ]
 
 export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh {
-  // Convert normalized stage [0,1] coords to NDC [-1,1]; flip Y (stage Y↓, NDC Y↑)
-  const dst: [number, number][] = surface.outputPolygon.map((p: Point) => [
-    p.x * 2 - 1,
-    1 - p.y * 2,
-  ])
-
-  const H = computeHomography(SRC_UVS, dst)
-
-  const positions = new Float32Array(12)
-  const uvs = new Float32Array(8)
-  const ws = new Float32Array(4)
-
-  SRC_UVS.forEach(([u, v], i) => {
-    const w = H[6] * u + H[7] * v + H[8]
-    positions[i * 3]     = dst[i][0] * w
-    positions[i * 3 + 1] = dst[i][1] * w
-    positions[i * 3 + 2] = 0
-    uvs[i * 2]     = u
-    uvs[i * 2 + 1] = v
-    ws[i] = w
-  })
-
-  const geo = new THREE.BufferGeometry()
-  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2))
-  geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
-  geo.setIndex([0, 1, 2, 0, 2, 3])
-
+  const geo     = buildHomographyGeo(surface)
   const texture = buildSurfaceTexture(surface)
   const material = texture
     ? new THREE.ShaderMaterial({
@@ -221,8 +276,34 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
         side: THREE.DoubleSide,
         depthTest: false,
       })
-
   return new THREE.Mesh(geo, material)
+}
+
+/** One mesh per visible ShaderLayer on the surface, rendered on top of the
+ *  canvas-texture pass. Each mesh stores `layerId` in `userData` so the
+ *  reaction engine can target uniforms by layer id. */
+export function buildShaderLayerMeshes(surface: Surface): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = []
+  for (const layer of surface.layers) {
+    if (layer.type !== 'shader' || !layer.visible) continue
+    const sl = layer as ShaderLayer
+    const geo = buildHomographyGeo(surface)
+    const material = new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader: PRESET_SHADERS[sl.preset],
+      uniforms: {
+        uTime:      { value: 0 },
+        uIntensity: { value: sl.uniforms.uIntensity ?? 0 },
+      },
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthTest: false,
+    })
+    const mesh = new THREE.Mesh(geo, material)
+    mesh.userData.layerId = sl.id
+    meshes.push(mesh)
+  }
+  return meshes
 }
 
 export function disposeSurfaceMesh(mesh: THREE.Mesh): void {
@@ -230,4 +311,9 @@ export function disposeSurfaceMesh(mesh: THREE.Mesh): void {
   const mat = mesh.material as THREE.ShaderMaterial
   ;(mat.uniforms.uTexture?.value as THREE.Texture | undefined)?.dispose()
   mat.dispose()
+}
+
+export function disposeShaderLayerMesh(mesh: THREE.Mesh): void {
+  mesh.geometry.dispose()
+  ;(mesh.material as THREE.ShaderMaterial).dispose()
 }
