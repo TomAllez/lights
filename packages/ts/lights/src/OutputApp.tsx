@@ -22,10 +22,15 @@ export default function OutputApp() {
     const shaderGroup = new THREE.Group();
     scene.add(shaderGroup);
 
-    // rAF loop for ShaderLayer uTime animation
+    // rAF loop for ShaderLayer uTime animation, throttled to 30 fps
+    const SHADER_FRAME_MS = 1000 / 30;
     let animId: number | null = null;
+    let lastShaderRender = 0;
     const t0 = performance.now();
-    function tick() {
+    function tick(timestamp: number) {
+      animId = requestAnimationFrame(tick);
+      if (timestamp - lastShaderRender < SHADER_FRAME_MS) return;
+      lastShaderRender = timestamp;
       const t = (performance.now() - t0) / 1000;
       shaderGroup.traverse(obj => {
         if (!(obj instanceof THREE.Mesh)) return;
@@ -33,7 +38,6 @@ export default function OutputApp() {
         if (mat.uniforms?.uTime) mat.uniforms.uTime.value = t;
       });
       render();
-      animId = requestAnimationFrame(tick);
     }
 
     // ── Volume pass (perspective) ─────────────────────────────────────────────

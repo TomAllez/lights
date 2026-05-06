@@ -81,11 +81,18 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     scene.add(shaderGroup);
     shaderGroupRef.current = shaderGroup;
 
-    // rAF loop — runs only while shader layers are present on the active slide
+    // rAF loop — runs only while shader layers are present on the active slide.
+    // Throttled to 30 fps: schedule every rAF but only update uniforms + render
+    // when enough time has elapsed, halving the GPU load vs the display rate.
     const DECAY_MS = 600;
+    const SHADER_FRAME_MS = 1000 / 30;
     let animId: number | null = null;
+    let lastShaderRender = 0;
     const t0 = performance.now();
-    function tick() {
+    function tick(timestamp: number) {
+      animId = requestAnimationFrame(tick);
+      if (timestamp - lastShaderRender < SHADER_FRAME_MS) return;
+      lastShaderRender = timestamp;
       const now = performance.now();
       const t = (now - t0) / 1000;
       shaderGroup.traverse(obj => {
@@ -103,7 +110,6 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
         }
       });
       render();
-      animId = requestAnimationFrame(tick);
     }
     startAnimRef.current = () => { if (animId === null) animId = requestAnimationFrame(tick); };
     stopAnimRef.current  = () => { if (animId !== null) { cancelAnimationFrame(animId); animId = null; } };
