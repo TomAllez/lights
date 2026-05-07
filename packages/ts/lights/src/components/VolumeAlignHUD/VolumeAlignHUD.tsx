@@ -1,7 +1,8 @@
+import './VolumeAlignHUD.css'
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
-import { useProject } from '../model/ProjectContext'
-import type { VolumeCamera } from '../model/types'
+import { useProject } from '../../contexts'
+import type { VolumeCamera } from '../../model/types'
 
 // ── Repeat button ─────────────────────────────────────────────────────────────
 

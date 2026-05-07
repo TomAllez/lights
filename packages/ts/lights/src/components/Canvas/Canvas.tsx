@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useProject } from '../model/ProjectContext';
+import { useProject } from '../../contexts';
 import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
-import type { Hand, Landmark } from './canvas/landmarks';
+import type { Hand, Landmark } from './landmarks';
 import {
   decodeFacemesh,
   decodeHandpose,
   drawFaces,
   drawHands,
   frameRect,
-} from './canvas/landmarks';
+} from './landmarks';
 
 /**
  * Main stage canvas: renders the live camera frame as a WebGL texture, overlays

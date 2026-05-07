@@ -1,8 +1,9 @@
+import './SurfacePanel.css'
 import { useState } from 'react'
-import { useProject } from '../model/ProjectContext'
-import type { SolidLayer, TextLayer, VolumeShapeType } from '../model/types'
-import LayerList from './LayerList'
-import GraphConfigPanel from './GraphConfigPanel'
+import { useProject } from '../../contexts'
+import type { SolidLayer, TextLayer, VolumeShapeType } from '../../model/types'
+import LayerList from '../LayerList'
+import GraphConfigPanel from '../GraphConfigPanel'
 
 const SHAPE_TYPES: VolumeShapeType[] = ['box', 'sphere', 'cylinder', 'cone', 'grid']
 
@@ -131,7 +132,7 @@ export default function SurfacePanel() {
     const shapes = slide.volume.shapes
     const selectedShape = shapes.find(s => s.id === selectedShapeId)
 
-    const updateShape = (patch: Partial<import('../model/types').VolumeShape>) => {
+    const updateShape = (patch: Partial<import('../../model/types').VolumeShape>) => {
       if (selectedShape && selectedSlideId) {
         dispatch({
           type: 'volume:shapeUpdate',

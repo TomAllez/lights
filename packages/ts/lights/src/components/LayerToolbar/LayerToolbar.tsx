@@ -1,4 +1,5 @@
-import { useProject } from '../model'
+import './LayerToolbar.css'
+import { useProject } from '../../model'
 import { Square, Image as ImageIcon, Type } from 'lucide-react'
 
 export default function LayerToolbar() {

@@ -1,0 +1,128 @@
+.graph-config-panel {
+  border-top: 1px solid #1a1a1a;
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-config-header {
+  padding: 14px 12px 10px;
+  font-size: 10px;
+  color: #555;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.graph-module-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 8px;
+  gap: 2px;
+}
+
+.graph-module {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.graph-module.disabled {
+  opacity: 0.35;
+}
+
+.graph-module-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.graph-module-label {
+  font-size: 12px;
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.graph-module-badge {
+  font-size: 9px;
+  color: #555;
+  background: #1a1a1a;
+  border-radius: 3px;
+  padding: 1px 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.graph-toggle {
+  position: relative;
+  width: 28px;
+  height: 15px;
+  background: #2a2a2a;
+  border-radius: 8px;
+  cursor: pointer;
+  border: none;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.graph-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  background: #555;
+  border-radius: 50%;
+  transition:
+    transform 0.15s,
+    background 0.15s;
+}
+
+.graph-toggle.on {
+  background: #1a2744;
+}
+
+.graph-toggle.on::after {
+  transform: translateX(13px);
+  background: #60a5fa;
+}
+
+.graph-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.graph-module-params {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.graph-param-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.graph-param-label {
+  font-size: 10px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 56px;
+}
+
+.graph-param-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: #60a5fa;
+}
+
+.graph-param-value {
+  font-size: 10px;
+  color: #555;
+  min-width: 28px;
+  text-align: right;
+}

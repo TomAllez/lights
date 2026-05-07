@@ -1,8 +1,9 @@
+import './SurfaceCanvas.css'
 import { useEffect, useRef, useState } from 'react'
-import { useProject } from '../model/ProjectContext'
-import type { LayerTransform, Point } from '../model/types'
-import LayerObject from './LayerObject'
-import type { Corner } from './LayerObject'
+import { useProject } from '../../contexts'
+import type { LayerTransform, Point } from '../../model/types'
+import LayerObject from '../LayerObject'
+import type { Corner } from '../LayerObject'
 
 // ── Drag state ────────────────────────────────────────────────────────────────
 

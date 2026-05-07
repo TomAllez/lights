@@ -1,0 +1,38 @@
+.layer-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  width: 48px;
+  border-left: 1px solid #1e1e1e;
+  background: #0d0d0d;
+  flex-shrink: 0;
+}
+
+.layer-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: #4a4a4a;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 0.1s,
+    color 0.1s;
+}
+
+.layer-tool-btn:hover {
+  background: #1e1e1e;
+  color: #d0d0d0;
+}
+
+.layer-tool-btn:active {
+  background: #272727;
+  color: #fff;
+}

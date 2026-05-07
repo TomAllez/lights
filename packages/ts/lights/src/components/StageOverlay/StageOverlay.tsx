@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useProject } from '../model/ProjectContext'
-import type { Surface, Point } from '../model/types'
+import { useProject } from '../../contexts'
+import type { Surface, Point } from '../../model/types'
 
 // Session-only surface clipboard — not persisted in project state.
 let surfaceClipboard: Surface | null = null

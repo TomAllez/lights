@@ -1,4 +1,4 @@
-import type { Point as BasePoint, GraphConfig } from '../ipc/types'
+import type { Point as BasePoint, GraphConfig } from '../ipc'
 import type { 
   VolumeShapeType, VolumeEditMode, Vec3, VolumeCamera, 
   VolumeShape as BaseVolumeShape, Volume as BaseVolume,

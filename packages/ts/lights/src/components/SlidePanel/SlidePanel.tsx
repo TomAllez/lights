@@ -1,5 +1,6 @@
+import './SlidePanel.css'
 import { useState } from 'react'
-import { useProject } from '../model/ProjectContext'
+import { useProject } from '../../contexts'
 
 export default function SlidePanel() {
   const { state, dispatch } = useProject()

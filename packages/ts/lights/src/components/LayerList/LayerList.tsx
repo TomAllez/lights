@@ -1,5 +1,6 @@
+import './LayerList.css'
 import { useState } from 'react'
-import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../model/types'
+import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../../model/types'
 
 interface LayerListProps {
   surface: { layers: Layer[] }

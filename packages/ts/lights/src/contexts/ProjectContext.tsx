@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
-import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera, VolumeEditMode } from './types'
+import type { ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera, VolumeEditMode } from '../model/types'
 
 export type EditorMode = 'stage' | 'surface' | 'volume-align' | 'volume-editor'
 
@@ -65,9 +65,9 @@ export type ProjectAction =
   | { type: 'volume:updateCamera'; slideId: string; camera: VolumeCamera }
   | { type: 'volume:editorEnter' }
   | { type: 'volume:editorExit' }
-  | { type: 'volume:shapeAdd'; slideId: string; shapeType: import('./types').VolumeShapeType }
+  | { type: 'volume:shapeAdd'; slideId: string; shapeType: import('../model/types').VolumeShapeType }
   | { type: 'volume:shapeRemove'; slideId: string; shapeId: string }
-  | { type: 'volume:shapeUpdate'; slideId: string; shape: import('./types').VolumeShape }
+  | { type: 'volume:shapeUpdate'; slideId: string; shape: import('../model/types').VolumeShape }
   | { type: 'volume:shapeSelect'; shapeId: string | null }
   | { type: 'volume:editModeSet'; mode: VolumeEditMode }
 
@@ -434,7 +434,7 @@ function applyVolumeAction(state: ProjectState, action: VolumeAction): ProjectSt
     case 'volume:shapeAdd': {
       const slide = project.slides.find(s => s.id === action.slideId)
       if (!slide?.volume) return state
-      const shape: import('./types').VolumeShape = {
+      const shape: import('../model/types').VolumeShape = {
         id: crypto.randomUUID(),
         name: `${action.shapeType.charAt(0).toUpperCase() + action.shapeType.slice(1)} ${slide.volume.shapes.length + 1}`,
         type: action.shapeType,

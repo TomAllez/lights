@@ -1,5 +1,6 @@
-import { useProject } from '../model/ProjectContext'
-import type { GraphConfig } from '../ipc/types'
+import './GraphConfigPanel.css'
+import { useProject } from '../../contexts'
+import type { GraphConfig } from '../../ipc'
 
 interface ModuleDef {
   id: string

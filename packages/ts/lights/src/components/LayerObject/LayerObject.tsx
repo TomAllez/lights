@@ -1,4 +1,5 @@
-import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../model/types'
+import './LayerObject.css'
+import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../../model/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

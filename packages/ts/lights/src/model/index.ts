@@ -1,4 +1,5 @@
+export { GraphProvider, useGraph } from '../contexts'
+export { ProjectProvider, useProject } from '../contexts'
+export type { ProjectAction, ProjectState } from '../contexts'
 export * from './types'
-export { ProjectProvider, useProject } from './ProjectContext'
-export type { ProjectState, ProjectAction } from './ProjectContext'
-export { GraphProvider, useGraph } from './GraphContext'
+

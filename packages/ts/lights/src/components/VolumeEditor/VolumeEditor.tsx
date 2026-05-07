@@ -1,7 +1,8 @@
+import './VolumeEditor.css'
 import { useEffect, useRef, useState } from 'react'
-import { useProject } from '../model/ProjectContext'
+import { useProject } from '../../contexts'
 import { VolumeScene, type GizmoMode } from '@lights/three-scene'
-import type { VolumeEditMode } from '../model/types'
+import type { VolumeEditMode } from '../../model/types'
 
 export default function VolumeEditor() {
   const { state, dispatch } = useProject()
@@ -25,7 +26,7 @@ export default function VolumeEditor() {
       },
       onShapeUpdate: (shape) => {
         if (selectedSlideId) {
-          dispatch({ type: 'volume:shapeUpdate', slideId: selectedSlideId, shape: shape as import('../model/types').VolumeShape })
+          dispatch({ type: 'volume:shapeUpdate', slideId: selectedSlideId, shape: shape as import('../../model/types').VolumeShape })
         }
       }
     })
