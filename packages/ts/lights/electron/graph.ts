@@ -10,7 +10,25 @@ import { GraphStatus } from '../src/ipc'
 // ── Position decoders ─────────────────────────────────────────────────────────
 
 /**
- * Extracts a single representative (x, y) position from a raw detection frame
+ * Returns a unique detection ID for an event, incorporating disambiguation
+ * metadata for events that may fire multiple times per frame.
+ *
+ * For `handpose`, two events can arrive in the same frame (one per hand).
+ * Using `event.type` directly would make both share the ID `'handpose'` and
+ * the second would silently overwrite the first on the receiving end.
+ * Handedness (byte 0: 0=left, 1=right) is appended to prevent that.
+ */
+function detectionId(event: FrameEvent): string {
+  switch (event.type) {
+    case 'handpose':
+      return `handpose:${event.data[0] === 1 ? 'right' : 'left'}`
+    default:
+      return event.type
+  }
+}
+
+/**
+ * Extracts a single representative (x, y) position from a raw detection event
  * in normalised [0, 1] camera-frame coordinates.
  *
  * Each Python module uses its own binary layout; this function centralises the
@@ -60,7 +78,7 @@ class GraphManager {
   private graph: Graph | null = null
   private readonly modules = new Map<string, ModuleEntry>()
 
-  constructor(private readonly mainWindow: BrowserWindow) {}
+  constructor(private readonly mainWindow: BrowserWindow) { }
 
   // ── IPC command handlers ────────────────────────────────────────────────────
 
@@ -177,7 +195,7 @@ class GraphManager {
         for (const event of frame.getEvents()) {
           this.emit({
             type: 'detection',
-            moduleId: event.type,
+            moduleId: detectionId(event),
             position: decodePosition(event),
             data: event.data.buffer as ArrayBuffer,
           })
@@ -211,9 +229,9 @@ export function registerGraphHandlers(mainWindow: BrowserWindow) {
 
   const onCommand = (_event: Electron.IpcMainEvent, cmd: GraphCommand) => {
     switch (cmd.type) {
-      case 'slide:activate':    manager.activate(cmd.config);                       break
-      case 'graph:stop':        manager.stop();                                     break
-      case 'module:setParams':  manager.setModuleParams(cmd.moduleId, cmd.params);  break
+      case 'slide:activate': manager.activate(cmd.config); break
+      case 'graph:stop': manager.stop(); break
+      case 'module:setParams': manager.setModuleParams(cmd.moduleId, cmd.params); break
     }
   }
 
@@ -222,6 +240,7 @@ export function registerGraphHandlers(mainWindow: BrowserWindow) {
   return {
     stop: () => {
       manager.stop()
+
       ipcMain.removeListener('graph:command', onCommand)
     }
   }

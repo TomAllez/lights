@@ -98,9 +98,11 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
 
     // Last confirmed detections — redrawn on every frame so landmarks persist
     // across frames where the Python module was busy (exhaustMap dropped them).
-    let lastHands: Hand[] = [];
+    // Hands are keyed by moduleId ('handpose:left' / 'handpose:right') so both
+    // hands are tracked independently with their own TTLs.
+    const lastHandsMap = new Map<string, Hand>();
+    const handExpiries = new Map<string, ReturnType<typeof setTimeout>>();
     let lastFaces: Landmark[][] = [];
-    let handsExpiry: ReturnType<typeof setTimeout> | null = null;
     let facesExpiry: ReturnType<typeof setTimeout> | null = null;
 
     const LANDMARK_TTL = 300;
@@ -136,16 +138,21 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
       const { clientWidth: cw, clientHeight: ch } = container;
       ctx.clearRect(0, 0, cw, ch);
       const r = frameRect(cw, ch, frameW, frameH);
-      if (lastHands.length > 0) drawHands(ctx, lastHands, r);
+      if (lastHandsMap.size > 0) drawHands(ctx, [...lastHandsMap.values()], r);
       if (lastFaces.length > 0) drawFaces(ctx, lastFaces, r);
     }
 
     const off = window.lights.onEvent((event) => {
       if (event.type === 'detection') {
-        if (event.moduleId === 'handpose' && event.data.byteLength >= 1 + 21 * 12) {
-          lastHands = [decodeHandpose(event.data)];
-          if (handsExpiry) clearTimeout(handsExpiry);
-          handsExpiry = setTimeout(() => { lastHands = []; drawOverlay(); }, LANDMARK_TTL);
+        if (event.moduleId.startsWith('handpose:') && event.data.byteLength >= 1 + 21 * 12) {
+          lastHandsMap.set(event.moduleId, decodeHandpose(event.data));
+          const prev = handExpiries.get(event.moduleId);
+          if (prev) clearTimeout(prev);
+          handExpiries.set(event.moduleId, setTimeout(() => {
+            lastHandsMap.delete(event.moduleId);
+            handExpiries.delete(event.moduleId);
+            drawOverlay();
+          }, LANDMARK_TTL));
         } else if (event.moduleId === 'facemesh' && event.data.byteLength >= 468 * 12) {
           lastFaces = [decodeFacemesh(event.data)];
           if (facesExpiry) clearTimeout(facesExpiry);
@@ -186,7 +193,7 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     return () => {
       off();
       observer.disconnect();
-      if (handsExpiry) clearTimeout(handsExpiry);
+      for (const t of handExpiries.values()) clearTimeout(t);
       if (facesExpiry) clearTimeout(facesExpiry);
       geometry.dispose();
       material.dispose();
