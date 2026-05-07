@@ -1,8 +1,9 @@
 import type { Point as BasePoint, GraphConfig } from '../ipc'
-import type { 
-  VolumeShapeType, VolumeEditMode, Vec3, VolumeCamera, 
+import type {
+  VolumeShapeType, VolumeEditMode, Vec3, VolumeCamera,
   VolumeShape as BaseVolumeShape, Volume as BaseVolume,
   SolidLayer as BaseSolidLayer, ImageLayer as BaseImageLayer, TextLayer as BaseTextLayer,
+  DetectionCanvasLayer as BaseDetectionCanvasLayer,
   LayerTransform as BaseLayerTransform, Point, Surface as BaseSurface
 } from '@lights/three-scene'
 
@@ -17,7 +18,8 @@ export interface LayerTransform extends BaseLayerTransform {
 export interface SolidLayer extends BaseSolidLayer { transform: LayerTransform }
 export interface ImageLayer extends BaseImageLayer { transform: LayerTransform }
 export interface TextLayer extends BaseTextLayer { transform: LayerTransform }
-export type Layer = SolidLayer | ImageLayer | TextLayer
+export interface DetectionCanvasLayer extends BaseDetectionCanvasLayer { transform: LayerTransform }
+export type Layer = SolidLayer | ImageLayer | TextLayer | DetectionCanvasLayer
 
 export interface Reaction { id: string }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type

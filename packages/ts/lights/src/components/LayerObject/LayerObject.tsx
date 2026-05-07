@@ -1,5 +1,5 @@
 import './LayerObject.css'
-import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../../model/types'
+import type { DetectionCanvasLayer, ImageLayer, Layer, SolidLayer, TextLayer } from '../../model/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -51,10 +51,11 @@ export default function LayerObject({
         : {}
 
   const textLayer = layer.type === 'text' ? (layer as TextLayer) : null
+  const detectionLayer = layer.type === 'detectionCanvas' ? (layer as DetectionCanvasLayer) : null
 
   return (
     <div
-      className={`layer-object${isSelected ? ' layer-object--selected' : ''}`}
+      className={`layer-object${isSelected ? ' layer-object--selected' : ''}${detectionLayer ? ' layer-object--detection' : ''}`}
       style={{
         left: t.x * canvasW,
         top: t.y * canvasH,
@@ -72,6 +73,9 @@ export default function LayerObject({
         >
           {textLayer.content}
         </div>
+      )}
+      {detectionLayer && (
+        <div className="layer-detection-label">{detectionLayer.rendererId}</div>
       )}
       {isSelected && (
         <>

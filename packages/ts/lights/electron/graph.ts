@@ -78,7 +78,10 @@ class GraphManager {
   private graph: Graph | null = null
   private readonly modules = new Map<string, ModuleEntry>()
 
-  constructor(private readonly mainWindow: BrowserWindow) { }
+  constructor(
+    private readonly mainWindow: BrowserWindow,
+    private readonly getOutputWin: () => BrowserWindow | null,
+  ) { }
 
   // ── IPC command handlers ────────────────────────────────────────────────────
 
@@ -123,8 +126,16 @@ class GraphManager {
    * No-ops silently if the window has already been destroyed.
    */
   private emit(event: GraphEvent): void {
-    if (this.mainWindow.isDestroyed()) return
-    this.mainWindow.webContents.send('graph:event', event)
+    if (!this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send('graph:event', event)
+    }
+    // Detection events are also needed by the output window for live canvas effects
+    if (event.type === 'detection') {
+      const outputWin = this.getOutputWin()
+      if (outputWin && !outputWin.isDestroyed()) {
+        outputWin.webContents.send('graph:event', event)
+      }
+    }
   }
 
   /**
@@ -224,8 +235,11 @@ class GraphManager {
  * IPC listener, and returns a cleanup handle that stops the graph and removes the
  * listener when the window closes.
  */
-export function registerGraphHandlers(mainWindow: BrowserWindow) {
-  const manager = new GraphManager(mainWindow)
+export function registerGraphHandlers(
+  mainWindow: BrowserWindow,
+  getOutputWin: () => BrowserWindow | null,
+) {
+  const manager = new GraphManager(mainWindow, getOutputWin)
 
   const onCommand = (_event: Electron.IpcMainEvent, cmd: GraphCommand) => {
     switch (cmd.type) {

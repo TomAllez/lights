@@ -36,3 +36,47 @@
   background: #272727;
   color: #fff;
 }
+
+.layer-tool-btn.active {
+  background: #1a2744;
+  color: #60a5fa;
+}
+
+.layer-tool-detection {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.layer-tool-picker {
+  position: absolute;
+  left: calc(100% + 6px);
+  top: 0;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 4px;
+  z-index: 100;
+  min-width: 130px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.layer-tool-picker-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #aaa;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.layer-tool-picker-item:hover {
+  background: #242424;
+  color: #fff;
+}

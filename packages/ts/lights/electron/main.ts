@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
-import { fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { registerGraphHandlers } from './graph'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -27,11 +27,11 @@ ipcMain.handle('dialog:pick-image', async () => {
   const filePath = result.filePaths[0]
   const ext = path.extname(filePath).slice(1).toLowerCase()
   const mime =
-    ext === 'png'  ? 'image/png'      :
-    ext === 'gif'  ? 'image/gif'      :
-    ext === 'webp' ? 'image/webp'     :
-    ext === 'svg'  ? 'image/svg+xml'  :
-                     'image/jpeg'
+    ext === 'png' ? 'image/png' :
+      ext === 'gif' ? 'image/gif' :
+        ext === 'webp' ? 'image/webp' :
+          ext === 'svg' ? 'image/svg+xml' :
+            'image/jpeg'
   const data = await fs.readFile(filePath)
   return { name: path.basename(filePath), src: `data:${mime};base64,${data.toString('base64')}` }
 })
@@ -164,8 +164,8 @@ function createOutputWindow() {
     },
   })
 
-  outputWin.on('closed', () => { 
-    outputWin = null 
+  outputWin.on('closed', () => {
+    outputWin = null
     if (win && !win.isDestroyed()) {
       win.webContents.send('output:closed')
     }
@@ -224,6 +224,7 @@ function createWindow() {
 
   if (DEV_SERVER_URL) {
     win.loadURL(DEV_SERVER_URL)
+    win.webContents.openDevTools()
   } else {
     win.loadFile(path.join(process.env.APP_ROOT!, 'dist/index.html'))
   }
@@ -233,7 +234,7 @@ app.whenReady().then(() => {
   buildMenu()
   createWindow()
   createOutputWindow()
-  graphHandlers = registerGraphHandlers(win!)
+  graphHandlers = registerGraphHandlers(win!, () => outputWin)
 })
 
 app.on('before-quit', () => {

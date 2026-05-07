@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Subject } from 'rxjs'
-import { GraphStatus } from '../ipc'
-import type { GraphEvent } from '../ipc'
+import { GraphStatus, decodeTypedDetection } from '../ipc'
+import type { GraphEvent, TypedDetectionEvent } from '../ipc'
 import { useProject } from './ProjectContext'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -13,6 +13,8 @@ interface GraphContextValue {
   status: GraphStatus
   stopGraph: () => void
   detection$: Subject<DetectionEvent>
+  /** Decoded, strongly-typed detection stream. Prefer this over `detection$` for new consumers. */
+  typedDetection$: Subject<TypedDetectionEvent>
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -28,6 +30,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   // Stable Subject — created once, never replaced. Consumers subscribe via
   // useEffect and unsubscribe on cleanup; no React state copy of detections.
   const detection$ = useRef(new Subject<DetectionEvent>()).current
+  const typedDetection$ = useRef(new Subject<TypedDetectionEvent>()).current
 
   function stopGraph() {
     window.lights.sendCommand({ type: 'graph:stop' })
@@ -42,6 +45,8 @@ export function GraphProvider({ children }: { children: ReactNode }) {
         setStatus(event.status)
       } else if (event.type === 'detection') {
         detection$.next(event as DetectionEvent)
+        const typed = decodeTypedDetection(event.moduleId, event.position, event.data)
+        if (typed) typedDetection$.next(typed)
       }
     })
   }, [detection$])
@@ -69,7 +74,7 @@ export function GraphProvider({ children }: { children: ReactNode }) {
   }, [selectedSlideId, graphConfigKey])
 
   return (
-    <GraphContext.Provider value={{ status, stopGraph, detection$ }}>
+    <GraphContext.Provider value={{ status, stopGraph, detection$, typedDetection$ }}>
       {children}
     </GraphContext.Provider>
   )

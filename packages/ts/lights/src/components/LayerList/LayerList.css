@@ -106,3 +106,10 @@
   flex-shrink: 0;
   opacity: 0.8;
 }
+
+.layer-detection-badge {
+  font-size: 13px;
+  flex-shrink: 0;
+  color: #40c4ff;
+  opacity: 0.8;
+}

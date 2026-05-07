@@ -1,7 +1,16 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { Slide } from './model/types';
-import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
+import { buildSurfaceMesh, buildLiveSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
+import type { DrawDetectionLayer } from '@lights/three-scene';
+import { createRenderer } from './detectionCanvas';
+import type { DetectionCanvasRenderer } from './detectionCanvas';
+import { decodeTypedDetection } from './ipc';
+
+interface LiveEntry {
+  recomposite: (dt: number) => void
+  renderers: Map<string, DetectionCanvasRenderer>
+}
 
 export default function OutputApp() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,6 +35,10 @@ export default function OutputApp() {
     const volumeGroup = new THREE.Group();
     volumeScene.add(volumeGroup);
 
+    // ── Live surface tracking ─────────────────────────────────────────────────
+    const liveSurfaces = new Map<string, LiveEntry>();
+    let lastDetectionTime = performance.now();
+
     function render() {
       renderer.autoClear = true;
       renderer.render(scene, camera);
@@ -33,14 +46,42 @@ export default function OutputApp() {
       renderer.render(volumeScene, volumeCamera);
     }
 
+    function clearLiveSurfaces() {
+      for (const { renderers } of liveSurfaces.values()) {
+        for (const r of renderers.values()) r.dispose();
+      }
+      liveSurfaces.clear();
+    }
+
     async function renderSlide(slide: Slide) {
       // Surfaces
+      clearLiveSurfaces();
       surfaceGroup.traverse((child) => {
         if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
       });
       surfaceGroup.clear();
+
       await preloadSurfaces(slide.surfaces);
-      slide.surfaces.forEach((surface, i) => surfaceGroup.add(buildSurfaceMesh(surface, i)));
+
+      slide.surfaces.forEach((surface, i) => {
+        const hasLive = surface.layers.some(l => l.type === 'detectionCanvas' && l.visible);
+        if (!hasLive) {
+          surfaceGroup.add(buildSurfaceMesh(surface, i));
+          return;
+        }
+        const renderers = new Map<string, DetectionCanvasRenderer>();
+        for (const layer of surface.layers) {
+          if (layer.type !== 'detectionCanvas' || !layer.visible) continue;
+          const r = createRenderer(layer.rendererId, layer.params);
+          if (r) renderers.set(layer.id, r);
+        }
+        const drawFn: DrawDetectionLayer = (ctx, layerId, transform, w, h, dt) => {
+          renderers.get(layerId)?.render(ctx, w, h, transform, dt);
+        };
+        const { mesh, recomposite } = buildLiveSurfaceMesh(surface, i, drawFn);
+        surfaceGroup.add(mesh);
+        liveSurfaces.set(surface.id, { recomposite, renderers });
+      });
 
       // Volume
       volumeGroup.traverse((child) => {
@@ -60,8 +101,23 @@ export default function OutputApp() {
       render();
     }
 
-    const off = window.lights.onOutputRender((data) => {
+    const offSlide = window.lights.onOutputRender((data) => {
       renderSlide(data as Slide);
+    });
+
+    // Route detection events to live surface renderers
+    const offEvent = window.lights.onEvent((event) => {
+      if (event.type !== 'detection') return;
+      const typed = decodeTypedDetection(event.moduleId, event.position, event.data);
+      if (!typed || liveSurfaces.size === 0) return;
+      const now = performance.now();
+      const dt = now - lastDetectionTime;
+      lastDetectionTime = now;
+      for (const { renderers, recomposite } of liveSurfaces.values()) {
+        for (const r of renderers.values()) r.onDetection(typed);
+        recomposite(dt);
+      }
+      render();
     });
 
     function updateLayout() {
@@ -77,8 +133,10 @@ export default function OutputApp() {
     updateLayout();
 
     return () => {
-      off();
+      offSlide();
+      offEvent();
       observer.disconnect();
+      clearLiveSurfaces();
       surfaceGroup.traverse((child) => {
         if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
       });

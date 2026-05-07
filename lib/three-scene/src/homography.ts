@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import type { ImageLayer, SolidLayer, Surface, TextLayer, Layer, Point } from './types'
+import type { ImageLayer, SolidLayer, Surface, TextLayer, Layer, Point, LayerTransform } from './types'
 
 // ── Shaders ──────────────────────────────────────────────────────────────────
 
@@ -104,78 +104,75 @@ export async function preloadSurfaces(surfaces: Surface[]): Promise<void> {
   await Promise.all(srcs.map(loadImg))
 }
 
-// ── Texture compositor ────────────────────────────────────────────────────────
+// ── Layer drawing ─────────────────────────────────────────────────────────────
 
-// Composite all visible layers onto an offscreen canvas (surface local space,
-// Y-down), then wrap it in a Three.js CanvasTexture. Returns null if no layers.
 const TEX_SIZE = 512
 
+function drawStaticLayer(
+  ctx: CanvasRenderingContext2D,
+  layer: SolidLayer | ImageLayer | TextLayer,
+): void {
+  const t = layer.transform
+  ctx.save()
+  ctx.translate(t.x * TEX_SIZE, t.y * TEX_SIZE)
+  ctx.rotate(t.rotation * Math.PI / 180)
+
+  if (layer.type === 'solid') {
+    ctx.fillStyle = layer.color
+    ctx.fillRect(-t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
+  } else if (layer.type === 'image') {
+    const img = imgCache.get(layer.src)
+    if (img) ctx.drawImage(img, -t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
+  } else if (layer.type === 'text') {
+    const scaledSize = layer.fontSize * TEX_SIZE / 500
+    ctx.font = `${scaledSize}px sans-serif`
+    ctx.fillStyle = layer.color
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const boxW = t.w * TEX_SIZE
+    const lines = layer.content.split('\n')
+    const lineH = scaledSize * 1.2
+    const totalH = lines.length * lineH
+    lines.forEach((line, i) => {
+      const y = -totalH / 2 + i * lineH + lineH / 2
+      ctx.fillText(line, 0, y, boxW)
+    })
+  }
+
+  ctx.restore()
+}
+
+// ── Texture compositor ────────────────────────────────────────────────────────
+
+// Composite all visible static layers onto an offscreen canvas (surface local
+// space, Y-down), then wrap it in a Three.js CanvasTexture. Returns null if no
+// visible static layers. Detection canvas layers are skipped here — they are
+// handled by buildLiveSurfaceMesh.
 function buildSurfaceTexture(surface: Surface): THREE.CanvasTexture | null {
-  const visibleLayers = surface.layers.filter((l: Layer) => l.visible)
-  if (visibleLayers.length === 0) return null
+  const visibleStatic = surface.layers.filter(
+    (l: Layer) => l.visible && l.type !== 'detectionCanvas',
+  )
+  if (visibleStatic.length === 0) return null
 
   const canvas = document.createElement('canvas')
   canvas.width  = TEX_SIZE
   canvas.height = TEX_SIZE
   const ctx = canvas.getContext('2d')!
 
-  // Render bottom-to-top: surface.layers[0] is the top layer in the panel,
-  // so we iterate in reverse to draw the backmost layer first.
   for (const layer of [...surface.layers].reverse()) {
-    if (!layer.visible) continue
-
-    const t = layer.transform
-    ctx.save()
-    ctx.translate(t.x * TEX_SIZE, t.y * TEX_SIZE)
-    ctx.rotate(t.rotation * Math.PI / 180)
-
-    if (layer.type === 'solid') {
-      const l = layer as SolidLayer
-      ctx.fillStyle = l.color
-      ctx.fillRect(-t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
-    } else if (layer.type === 'image') {
-      const img = imgCache.get((layer as ImageLayer).src)
-      if (img) {
-        ctx.drawImage(img, -t.w * TEX_SIZE / 2, -t.h * TEX_SIZE / 2, t.w * TEX_SIZE, t.h * TEX_SIZE)
-      }
-    } else if (layer.type === 'text') {
-      const tl = layer as TextLayer
-      const scaledSize = tl.fontSize * TEX_SIZE / 500
-      ctx.font = `${scaledSize}px sans-serif`
-      ctx.fillStyle = tl.color
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      const boxW = t.w * TEX_SIZE
-      const lines = tl.content.split('\n')
-      const lineH = scaledSize * 1.2
-      const totalH = lines.length * lineH
-      lines.forEach((line: string, i: number) => {
-        const y = -totalH / 2 + i * lineH + lineH / 2
-        ctx.fillText(line, 0, y, boxW)
-      })
-    }
-
-    ctx.restore()
+    if (!layer.visible || layer.type === 'detectionCanvas') continue
+    drawStaticLayer(ctx, layer as SolidLayer | ImageLayer | TextLayer)
   }
 
   return new THREE.CanvasTexture(canvas)
 }
 
-// ── Mesh builder ─────────────────────────────────────────────────────────────
+// ── Geometry builder ──────────────────────────────────────────────────────────
 
 // UV corners matching outputPolygon corner order: TL, TR, BR, BL
 const SRC_UVS: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]]
 
-const COLORS: [number, number, number][] = [
-  [0.38, 0.65, 0.98],
-  [0.37, 0.80, 0.60],
-  [0.98, 0.60, 0.38],
-  [0.80, 0.37, 0.74],
-  [0.98, 0.85, 0.37],
-]
-
-export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh {
-  // Convert normalized stage [0,1] coords to NDC [-1,1]; flip Y (stage Y↓, NDC Y↑)
+function buildSurfaceGeometry(surface: Surface): THREE.BufferGeometry {
   const dst: [number, number][] = surface.outputPolygon.map((p: Point) => [
     p.x * 2 - 1,
     1 - p.y * 2,
@@ -202,7 +199,45 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
   geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2))
   geo.setAttribute('aW',       new THREE.BufferAttribute(ws, 1))
   geo.setIndex([0, 1, 2, 0, 2, 3])
+  return geo
+}
 
+// ── Public types for live surfaces ────────────────────────────────────────────
+
+/**
+ * Callback invoked by the compositor for each visible detectionCanvas layer.
+ * Implement this in the app layer to forward the call to the appropriate
+ * DetectionCanvasRenderer instance.
+ */
+export type DrawDetectionLayer = (
+  ctx: CanvasRenderingContext2D,
+  layerId: string,
+  transform: LayerTransform,
+  w: number,
+  h: number,
+  dt: number,
+) => void
+
+/** Handle returned by buildLiveSurfaceMesh for surfaces with detection canvas layers. */
+export interface LiveSurfaceMesh {
+  mesh: THREE.Mesh
+  /** Recomposite all layers (static + detection) and mark the texture dirty. */
+  recomposite(dt: number): void
+}
+
+// ── Mesh builders ─────────────────────────────────────────────────────────────
+
+const COLORS: [number, number, number][] = [
+  [0.38, 0.65, 0.98],
+  [0.37, 0.80, 0.60],
+  [0.98, 0.60, 0.38],
+  [0.80, 0.37, 0.74],
+  [0.98, 0.85, 0.37],
+]
+
+/** Build a static surface mesh. Use for surfaces with no detectionCanvas layers. */
+export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh {
+  const geo = buildSurfaceGeometry(surface)
   const texture = buildSurfaceTexture(surface)
   const material = texture
     ? new THREE.ShaderMaterial({
@@ -223,6 +258,56 @@ export function buildSurfaceMesh(surface: Surface, colorIdx: number): THREE.Mesh
       })
 
   return new THREE.Mesh(geo, material)
+}
+
+/**
+ * Build a live surface mesh for surfaces that contain detectionCanvas layers.
+ * All layers (static + detection) are composited into one CanvasTexture each
+ * time `recomposite` is called, then reprojected by the same homography shader.
+ */
+export function buildLiveSurfaceMesh(
+  surface: Surface,
+  colorIdx: number,
+  drawDetectionLayer: DrawDetectionLayer,
+): LiveSurfaceMesh {
+  const geo = buildSurfaceGeometry(surface)
+
+  const canvas = document.createElement('canvas')
+  canvas.width  = TEX_SIZE
+  canvas.height = TEX_SIZE
+  const ctx = canvas.getContext('2d')!
+  const texture = new THREE.CanvasTexture(canvas)
+
+  const material = new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader: fragmentShaderTexture,
+    uniforms: { uTexture: { value: texture } },
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthTest: false,
+  })
+
+  const mesh = new THREE.Mesh(geo, material)
+
+  // Keep a fallback checker color for when the canvas is still empty.
+  void COLORS[colorIdx % COLORS.length]
+
+  function recomposite(dt: number): void {
+    ctx.clearRect(0, 0, TEX_SIZE, TEX_SIZE)
+    for (const layer of [...surface.layers].reverse()) {
+      if (!layer.visible) continue
+      if (layer.type === 'detectionCanvas') {
+        drawDetectionLayer(ctx, layer.id, layer.transform, TEX_SIZE, TEX_SIZE, dt)
+      } else {
+        drawStaticLayer(ctx, layer as SolidLayer | ImageLayer | TextLayer)
+      }
+    }
+    texture.needsUpdate = true
+  }
+
+  recomposite(0)
+
+  return { mesh, recomposite }
 }
 
 export function disposeSurfaceMesh(mesh: THREE.Mesh): void {

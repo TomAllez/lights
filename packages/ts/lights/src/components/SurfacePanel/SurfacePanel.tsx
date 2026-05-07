@@ -1,7 +1,8 @@
 import './SurfacePanel.css'
 import { useState } from 'react'
 import { useProject } from '../../contexts'
-import type { SolidLayer, TextLayer, VolumeShapeType } from '../../model/types'
+import type { DetectionCanvasLayer, SolidLayer, TextLayer, VolumeShapeType } from '../../model/types'
+import { getRendererIds } from '../../detectionCanvas'
 import LayerList from '../LayerList'
 import GraphConfigPanel from '../GraphConfigPanel'
 
@@ -41,6 +42,7 @@ export default function SurfacePanel() {
     const selectedLayer = surface.layers.find(l => l.id === selectedLayerId)
     const solidLayer = selectedLayer?.type === 'solid' ? (selectedLayer as SolidLayer) : undefined
     const textLayer = selectedLayer?.type === 'text' ? (selectedLayer as TextLayer) : undefined
+    const detectionLayer = selectedLayer?.type === 'detectionCanvas' ? (selectedLayer as DetectionCanvasLayer) : undefined
 
     function removeLayer(layerId: string) {
       dispatch({ type: 'layer:remove', slideId: selectedSlideId!, surfaceId: surface!.id, layerId })
@@ -94,6 +96,26 @@ export default function SurfacePanel() {
               value={solidLayer.color}
               onChange={e => dispatch({ type: 'layer:update', slideId: selectedSlideId!, surfaceId: surface!.id, layer: { ...solidLayer, color: e.target.value } })}
             />
+          </div>
+        )}
+
+        {detectionLayer && (
+          <div className="surface-editor">
+            <label className="surface-editor-label">Effect</label>
+            <select
+              className="surface-editor-select"
+              value={detectionLayer.rendererId}
+              onChange={e => dispatch({
+                type: 'layer:update',
+                slideId: selectedSlideId!,
+                surfaceId: surface!.id,
+                layer: { ...detectionLayer, rendererId: e.target.value },
+              })}
+            >
+              {getRendererIds().map(id => (
+                <option key={id} value={id}>{id}</option>
+              ))}
+            </select>
           </div>
         )}
 

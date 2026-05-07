@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useProject } from '../../contexts';
-import { buildSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
+import { useProject, useGraph } from '../../contexts';
+import { buildSurfaceMesh, buildLiveSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
+import type { DrawDetectionLayer } from '@lights/three-scene';
+import { createRenderer } from '../../detectionCanvas';
+import type { DetectionCanvasRenderer } from '../../detectionCanvas';
 import type { Hand, Landmark } from './landmarks';
 import {
   decodeFacemesh,
@@ -16,17 +19,24 @@ import {
  * the active slide's surface homography meshes, and draws MediaPipe landmark
  * skeletons on a transparent 2D canvas sitting above the WebGL layer.
  */
+interface LiveEntry {
+  recomposite: (dt: number) => void
+  renderers: Map<string, DetectionCanvasRenderer>
+}
+
 export default function Canvas({ showVideo }: { showVideo: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
   const volumeGroupRef = useRef<THREE.Group | null>(null);
   const volumeCameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const liveSurfacesRef = useRef(new Map<string, LiveEntry>());
 
   const showVideoRef = useRef(showVideo);
   showVideoRef.current = showVideo;
 
   const { state } = useProject();
+  const { typedDetection$ } = useGraph();
   const { project, selectedSlideId } = state;
 
   const surfaces = useMemo(
@@ -231,23 +241,62 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
   // ── Surface meshes (rebuilt whenever the active slide's surfaces change) ──
   useEffect(() => {
     const group = surfaceGroupRef.current;
+    const liveSurfaces = liveSurfacesRef.current;
     if (!group) return;
 
     let cancelled = false;
     preloadSurfaces(surfaces).then(() => {
       if (cancelled) return;
-      surfaces.forEach((surface, i) => group.add(buildSurfaceMesh(surface, i)));
+      surfaces.forEach((surface, i) => {
+        const hasLive = surface.layers.some(l => l.type === 'detectionCanvas' && l.visible);
+        if (!hasLive) {
+          group.add(buildSurfaceMesh(surface, i));
+          return;
+        }
+        const renderers = new Map<string, DetectionCanvasRenderer>();
+        for (const layer of surface.layers) {
+          if (layer.type !== 'detectionCanvas' || !layer.visible) continue;
+          const r = createRenderer(layer.rendererId, layer.params);
+          if (r) renderers.set(layer.id, r);
+        }
+        const drawFn: DrawDetectionLayer = (ctx, layerId, transform, w, h, dt) => {
+          renderers.get(layerId)?.render(ctx, w, h, transform, dt);
+        };
+        const { mesh, recomposite } = buildLiveSurfaceMesh(surface, i, drawFn);
+        group.add(mesh);
+        liveSurfaces.set(surface.id, { recomposite, renderers });
+      });
       renderRef.current();
     });
 
     return () => {
       cancelled = true;
+      for (const { renderers } of liveSurfaces.values()) {
+        for (const r of renderers.values()) r.dispose();
+      }
+      liveSurfaces.clear();
       group.traverse((child) => {
         if (child instanceof THREE.Mesh) disposeSurfaceMesh(child);
       });
       group.clear();
     };
   }, [surfaces]);
+
+  // ── Detection canvas routing ──────────────────────────────────────────────
+  useEffect(() => {
+    let lastTime = performance.now();
+    const sub = typedDetection$.subscribe(event => {
+      const now = performance.now();
+      const dt = now - lastTime;
+      lastTime = now;
+      for (const { renderers, recomposite } of liveSurfacesRef.current.values()) {
+        for (const r of renderers.values()) r.onDetection(event);
+        recomposite(dt);
+      }
+      renderRef.current();
+    });
+    return () => sub.unsubscribe();
+  }, [typedDetection$]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }} />;
 }

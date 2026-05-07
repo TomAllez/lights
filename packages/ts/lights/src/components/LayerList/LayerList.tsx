@@ -1,6 +1,6 @@
 import './LayerList.css'
 import { useState } from 'react'
-import type { ImageLayer, Layer, SolidLayer, TextLayer } from '../../model/types'
+import type { ImageLayer, Layer, SolidLayer, TextLayer, DetectionCanvasLayer } from '../../model/types'
 
 interface LayerListProps {
   surface: { layers: Layer[] }
@@ -91,6 +91,9 @@ export default function LayerList({
               )}
               {layer.type === 'text' && (
                 <span className="layer-text-badge" style={{ color: (layer as TextLayer).color }}>T</span>
+              )}
+              {layer.type === 'detectionCanvas' && (
+                <span className="layer-detection-badge" title={(layer as DetectionCanvasLayer).rendererId}>◎</span>
               )}
               <button
                 className="icon-btn layer-remove"

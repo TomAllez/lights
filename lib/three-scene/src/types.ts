@@ -41,7 +41,8 @@ export interface LayerTransform {
 export interface SolidLayer { id: string; type: 'solid'; name: string; visible: boolean; color: string; transform: LayerTransform }
 export interface ImageLayer { id: string; type: 'image'; name: string; visible: boolean; src: string; transform: LayerTransform }
 export interface TextLayer { id: string; type: 'text'; name: string; visible: boolean; content: string; fontSize: number; color: string; transform: LayerTransform }
-export type Layer = SolidLayer | ImageLayer | TextLayer
+export interface DetectionCanvasLayer { id: string; type: 'detectionCanvas'; name: string; visible: boolean; transform: LayerTransform; rendererId: string; params?: Record<string, unknown> }
+export type Layer = SolidLayer | ImageLayer | TextLayer | DetectionCanvasLayer
 
 export interface Surface {
   id: string
