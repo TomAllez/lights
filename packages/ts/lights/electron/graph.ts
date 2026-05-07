@@ -1,11 +1,11 @@
-import { ipcMain, BrowserWindow } from 'electron'
-import { Graph } from '@lights/graph'
 import { FfmpegDriver } from '@lights/driver-ffmpeg'
-import { PythonModule, AvailableModule } from '@lights/python-module'
-import { BaseRenderer } from '@lights/renderer'
+import { Graph } from '@lights/graph'
 import type { FrameEvent } from '@lights/io'
-import type { GraphCommand, GraphConfig, GraphEvent } from '../src/ipc/types'
-import { GraphStatus } from '../src/ipc/types'
+import { AvailableModule, PythonModule } from '@lights/python-module'
+import { BaseRenderer } from '@lights/renderer'
+import { BrowserWindow, ipcMain } from 'electron'
+import type { GraphCommand, GraphConfig, GraphEvent } from '../src/ipc'
+import { GraphStatus } from '../src/ipc'
 
 // ── Position decoders ─────────────────────────────────────────────────────────
 // Each Python module encodes its output differently. We extract a single
@@ -85,9 +85,11 @@ export function registerGraphHandlers(mainWindow: BrowserWindow) {
       })
 
     for (const [moduleId, availableModule] of enabledModules) {
+
       const pythonMod = new PythonModule(availableModule, {
         scriptArgs: ['--width', String(CAPTURE_WIDTH), '--height', String(CAPTURE_HEIGHT)],
       })
+
       const modRenderer = new BaseRenderer(`renderer-${moduleId}`)
 
       graph.addModule(moduleId, pythonMod)
