@@ -33,8 +33,19 @@ export class PythonModule extends AsyncModule {
   }
 
   override start(): void {
-    this.spawnPython();
+    if (!this.pythonProcess) {
+      this.spawnPython();
+    }
     super.start();
+  }
+
+  override passthrough(): void {
+    this.pythonProcess?.kill('SIGTERM');
+    this.pythonProcess = undefined;
+    for (const resolve of this.pendingResolvers) resolve([]);
+    this.pendingResolvers = [];
+    this.stdoutBuffer = Buffer.alloc(0);
+    super.passthrough();
   }
 
   override stop(): void {

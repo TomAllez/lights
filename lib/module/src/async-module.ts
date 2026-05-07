@@ -28,16 +28,25 @@ export abstract class AsyncModule {
   abstract process(frame: Frame): Promise<Frame>;
 
   /**
-   * Starts processing frames from the input port.
+   * Starts active processing: frames are passed through {@link process} via exhaustMap.
    */
   start(): void {
+    this.subscription?.unsubscribe();
     this.subscription = this.input.stream$.pipe(
       exhaustMap(frame => from(this.process(frame))),
     ).subscribe(frame => this.output.emit(frame));
   }
 
   /**
-   * Stops processing and unsubscribes from the input stream.
+   * Switches to passthrough mode: frames are forwarded unchanged without processing.
+   */
+  passthrough(): void {
+    this.subscription?.unsubscribe();
+    this.subscription = this.input.stream$.subscribe(frame => this.output.emit(frame));
+  }
+
+  /**
+   * Stops all frame flow and unsubscribes from the input stream.
    */
   stop(): void {
     this.subscription?.unsubscribe();

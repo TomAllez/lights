@@ -8,9 +8,14 @@ import type { GraphCommand, GraphConfig, GraphEvent } from '../src/ipc'
 import { GraphStatus } from '../src/ipc'
 
 // ── Position decoders ─────────────────────────────────────────────────────────
-// Each Python module encodes its output differently. We extract a single
-// representative (x, y) position in normalised [0,1] camera-frame coordinates.
 
+/**
+ * Extracts a single representative (x, y) position from a raw detection frame
+ * in normalised [0, 1] camera-frame coordinates.
+ *
+ * Each Python module uses its own binary layout; this function centralises the
+ * per-type decoding so the rest of the graph never needs to know the wire format.
+ */
 function decodePosition(event: FrameEvent): { x: number; y: number } {
   const view = new DataView(event.data.buffer, event.data.byteOffset, event.data.byteLength)
   switch (event.type) {
@@ -25,8 +30,10 @@ function decodePosition(event: FrameEvent): { x: number; y: number } {
   }
 }
 
-// Maps graphConfig module IDs (as used in the UI) to AvailableModule values
-// (which match the Python script directory names).
+/**
+ * Maps graphConfig module IDs (as used in the UI) to {@link AvailableModule} values
+ * (which match the Python script directory names).
+ */
 const MODULE_MAP: Partial<Record<string, AvailableModule>> = {
   'hand-pose': AvailableModule.HandPoseEstimation,
   'face-mesh': AvailableModule.FaceMeshEstimation,
@@ -35,71 +42,140 @@ const MODULE_MAP: Partial<Record<string, AvailableModule>> = {
 const CAPTURE_WIDTH = 940
 const CAPTURE_HEIGHT = 480
 
-// ── Graph handler ─────────────────────────────────────────────────────────────
+// ── GraphManager ──────────────────────────────────────────────────────────────
 
-export function registerGraphHandlers(mainWindow: BrowserWindow) {
-  let graph: Graph | null = null
+/** Runtime state for a single AI module and its paired detection renderer. */
+type ModuleEntry = { module: PythonModule; renderer: BaseRenderer; active: boolean }
 
-  function emit(event: GraphEvent) {
-    if (mainWindow.isDestroyed()) return
-    mainWindow.webContents.send('graph:event', event)
+/**
+ * Manages the lifetime of the processing graph for a single Electron window.
+ *
+ * The graph is built once on the first {@link activate} call and kept alive across
+ * slide changes. Subsequent activations only reconcile per-module state (start vs.
+ * passthrough) without tearing down the driver or rewiring the topology.
+ *
+ * Each public method maps directly to one `graph:command` IPC message type.
+ */
+class GraphManager {
+  private graph: Graph | null = null
+  private readonly modules = new Map<string, ModuleEntry>()
+
+  constructor(private readonly mainWindow: BrowserWindow) {}
+
+  // ── IPC command handlers ────────────────────────────────────────────────────
+
+  /**
+   * Activates a slide's processing config.
+   *
+   * Builds the graph on the first call; on subsequent calls it only reconciles
+   * which modules are active vs. in passthrough — no teardown or rewiring.
+   */
+  activate(config: GraphConfig): void {
+    if (this.graph) {
+      this.applyConfig(config)
+      return
+    }
+    this.build(config)
   }
 
-  function stopGraph() {
-    graph?.stop()
-    graph = null
-    if (!mainWindow.isDestroyed()) {
-      emit({ type: 'graph:status', status: GraphStatus.Stopped })
+  /**
+   * Stops the graph and all running modules, freeing the camera and Python processes.
+   * Emits a `graph:status` stopped event to the renderer.
+   */
+  stop(): void {
+    this.graph?.stop()
+    this.graph = null
+    this.modules.clear()
+    this.emit({ type: 'graph:status', status: GraphStatus.Stopped })
+  }
+
+  /**
+   * Updates runtime parameters for a running module.
+   * @param _moduleId - ID of the target module
+   * @param _params   - New parameter map to apply
+   */
+  setModuleParams(_moduleId: string, _params: Record<string, unknown>): void {
+    // TODO: hot-update module params without graph restart
+  }
+
+  // ── Private helpers ─────────────────────────────────────────────────────────
+
+  /**
+   * Sends a {@link GraphEvent} to the renderer process.
+   * No-ops silently if the window has already been destroyed.
+   */
+  private emit(event: GraphEvent): void {
+    if (this.mainWindow.isDestroyed()) return
+    this.mainWindow.webContents.send('graph:event', event)
+  }
+
+  /**
+   * Reconciles each module's running state against `config`.
+   *
+   * Only toggles modules whose enabled state actually changed, so in-flight frames
+   * on stable slides are never disrupted. Disabled modules are put in passthrough
+   * (frames still flow, no Python processing) and their renderer is stopped.
+   */
+  private applyConfig(config: GraphConfig): void {
+    for (const [moduleId, entry] of this.modules) {
+      const desired = config.modules[moduleId]?.enabled ?? false
+      if (desired === entry.active) continue
+      entry.active = desired
+      if (desired) {
+        entry.module.start()
+        entry.renderer.start()
+      } else {
+        entry.module.passthrough()
+        entry.renderer.stop()
+      }
     }
   }
 
-  function startGraph(config: GraphConfig) {
-    stopGraph()
-
-    graph = new Graph()
+  /**
+   * Constructs the full graph topology, starts every node, then calls
+   * {@link applyConfig} to immediately put disabled modules into passthrough.
+   *
+   * All modules from {@link MODULE_MAP} are pre-wired regardless of the initial
+   * config so that later enables/disables never require rewiring.
+   */
+  private build(config: GraphConfig): void {
+    this.graph = new Graph()
+    this.modules.clear()
 
     const driver = new FfmpegDriver({ width: CAPTURE_WIDTH, height: CAPTURE_HEIGHT, fps: 30 })
-    graph.addDriver('ffmpeg', driver)
+    this.graph.addDriver('ffmpeg', driver)
 
     // Video renderer — always connected directly to the driver.
     // Forwards raw pixel data to the renderer window for the live feed.
     const videoRenderer = new BaseRenderer('video')
-    graph.addRenderer('video', videoRenderer)
-    graph.connect('ffmpeg:output', 'video:input')
+    this.graph.addRenderer('video', videoRenderer)
+    this.graph.connect('ffmpeg:output', 'video:input')
     videoRenderer.attachProcess(frame => {
       const pixels = frame.getPart('video')
       if (pixels) {
-        emit({ type: 'frame', width: CAPTURE_WIDTH, height: CAPTURE_HEIGHT, data: pixels.buffer as ArrayBuffer })
+        this.emit({ type: 'frame', width: CAPTURE_WIDTH, height: CAPTURE_HEIGHT, data: pixels.buffer as ArrayBuffer })
       }
     })
 
-    // Per-module renderers — one per enabled module.
-    // Fan-out from the driver; each module path has its own renderer that
-    // extracts and forwards detection events. Fan-in is not used because
+    // Fan-out from the driver to every known module. Each module has its own
+    // renderer that forwards detection events. Fan-in is not used because
     // InputPort only supports one upstream connection at a time.
-    const enabledModules = Object.entries(config.modules)
-      .filter(([, m]) => m.enabled)
-      .flatMap(([id]) => {
-        const mod = MODULE_MAP[id]
-        return mod ? [[id, mod] as [string, AvailableModule]] : []
-      })
-
-    for (const [moduleId, availableModule] of enabledModules) {
+    for (const [moduleId, availableModule] of Object.entries(MODULE_MAP)) {
+      if (!availableModule) continue
 
       const pythonMod = new PythonModule(availableModule, {
         scriptArgs: ['--width', String(CAPTURE_WIDTH), '--height', String(CAPTURE_HEIGHT)],
       })
-
       const modRenderer = new BaseRenderer(`renderer-${moduleId}`)
 
-      graph.addModule(moduleId, pythonMod)
-      graph.addRenderer(`renderer-${moduleId}`, modRenderer)
-      graph.connect('ffmpeg:output', `${moduleId}:input`, { strategy: 'latest' })
-      graph.connect(`${moduleId}:output`, `renderer-${moduleId}:input`)
+      this.graph.addModule(moduleId, pythonMod)
+      this.graph.addRenderer(`renderer-${moduleId}`, modRenderer)
+      this.graph.connect('ffmpeg:output', `${moduleId}:input`, { strategy: 'latest' })
+      this.graph.connect(`${moduleId}:output`, `renderer-${moduleId}:input`)
 
       modRenderer.attachProcess(frame => {
         for (const event of frame.getEvents()) {
-          emit({
+          this.emit({
             type: 'detection',
             moduleId: event.type,
             position: decodePosition(event),
@@ -107,23 +183,37 @@ export function registerGraphHandlers(mainWindow: BrowserWindow) {
           })
         }
       })
+
+      // active=false: reconciled by applyConfig immediately after graph.start()
+      this.modules.set(moduleId, { module: pythonMod, renderer: modRenderer, active: false })
     }
 
-    graph.start()
-    emit({ type: 'graph:status', status: GraphStatus.Running })
+    // Wires all ports and starts every node; Python processes are spawned here.
+    this.graph.start()
+    this.emit({ type: 'graph:status', status: GraphStatus.Running })
+
+    // graph.start() left all modules active; reflect that before reconciling.
+    for (const entry of this.modules.values()) entry.active = true
+
+    this.applyConfig(config)
   }
+}
+
+// ── IPC registration ──────────────────────────────────────────────────────────
+
+/**
+ * Creates a {@link GraphManager} for `mainWindow`, registers the `graph:command`
+ * IPC listener, and returns a cleanup handle that stops the graph and removes the
+ * listener when the window closes.
+ */
+export function registerGraphHandlers(mainWindow: BrowserWindow) {
+  const manager = new GraphManager(mainWindow)
 
   const onCommand = (_event: Electron.IpcMainEvent, cmd: GraphCommand) => {
     switch (cmd.type) {
-      case 'slide:activate':
-        startGraph(cmd.config)
-        break
-      case 'graph:stop':
-        stopGraph()
-        break
-      case 'module:setParams':
-        // TODO: hot-update module params without graph restart
-        break
+      case 'slide:activate':    manager.activate(cmd.config);                       break
+      case 'graph:stop':        manager.stop();                                     break
+      case 'module:setParams':  manager.setModuleParams(cmd.moduleId, cmd.params);  break
     }
   }
 
@@ -131,7 +221,7 @@ export function registerGraphHandlers(mainWindow: BrowserWindow) {
 
   return {
     stop: () => {
-      stopGraph()
+      manager.stop()
       ipcMain.removeListener('graph:command', onCommand)
     }
   }
