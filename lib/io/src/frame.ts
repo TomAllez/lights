@@ -105,6 +105,20 @@ export class Frame {
   age(): number {
     return Date.now() - this.timestamp;
   }
+
+  /**
+   * Returns a new Frame with the same payload but a different events list.
+   * The underlying data buffer is shared — no copy is made.
+   */
+  withEvents(events: FrameEvent[]): Frame {
+    return new Frame({
+      timestamp: this.timestamp,
+      duration: this.duration,
+      metadata: this.metadata,
+      data: this.data,
+      events,
+    });
+  }
 }
 
 /**

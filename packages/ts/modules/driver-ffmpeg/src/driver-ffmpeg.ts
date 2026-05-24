@@ -15,15 +15,15 @@ export type FfmpegDriverOptions = {
   partName?: string;
 };
 
-/**
- * Driver that captures video from a macOS camera via FFmpeg (avfoundation).
- * Emits one Frame per video frame with raw RGB24 pixel data.
- *
- * @param {FfmpegDriverOptions} options - Capture configuration
- */
 export class FfmpegDriver extends BaseDriver {
   private process: ChildProcess | undefined;
-  private buffer = Buffer.alloc(0);
+
+  // Pre-allocated accumulation buffer — avoids Buffer.concat on every chunk.
+  // Sized at 2× frameSize so it can hold one full in-progress frame plus any
+  // leftover bytes from the previous read. Grows dynamically if a single chunk
+  // ever exceeds the available headroom (rare in practice).
+  private accumBuffer: Buffer;
+  private accumFill = 0;
 
   private readonly device: string;
   private readonly width: number;
@@ -40,11 +40,9 @@ export class FfmpegDriver extends BaseDriver {
     this.fps = options.fps ?? 30;
     this.partName = options.partName ?? 'video';
     this.frameSize = this.width * this.height * 3; // RGB24: 3 bytes per pixel
+    this.accumBuffer = Buffer.allocUnsafe(this.frameSize * 2);
   }
 
-  /**
-   * Spawns the ffmpeg process and begins emitting frames.
-   */
   start(): void {
     this.process = spawn(
       'ffmpeg',
@@ -61,18 +59,31 @@ export class FfmpegDriver extends BaseDriver {
     );
 
     this.process.stdout?.on('data', (chunk: Buffer) => {
-      this.buffer = Buffer.concat([this.buffer, chunk]);
+      // Grow accumulator if a single chunk exceeds remaining capacity.
+      if (this.accumFill + chunk.length > this.accumBuffer.length) {
+        const newBuf = Buffer.allocUnsafe(Math.max(this.accumBuffer.length * 2, this.accumFill + chunk.length));
+        this.accumBuffer.copy(newBuf, 0, 0, this.accumFill);
+        this.accumBuffer = newBuf;
+      }
 
-      while (this.buffer.length >= this.frameSize) {
-        const frameData = this.buffer.subarray(0, this.frameSize);
-        this.buffer = this.buffer.subarray(this.frameSize);
+      chunk.copy(this.accumBuffer, this.accumFill);
+      this.accumFill += chunk.length;
+
+      while (this.accumFill >= this.frameSize) {
+        // Copy out the completed frame before advancing (buffer will be reused).
+        const frameData = new Uint8Array(this.frameSize);
+        frameData.set(this.accumBuffer.subarray(0, this.frameSize));
+
+        // Shift remaining bytes to the front.
+        this.accumBuffer.copy(this.accumBuffer, 0, this.frameSize, this.accumFill);
+        this.accumFill -= this.frameSize;
 
         this.output.emit(
           createFrame({
             timestamp: Date.now(),
             duration: Math.round(1000 / this.fps),
             metadata: { [this.partName]: { offset: 0, size: this.frameSize } },
-            data: new Uint8Array(frameData),
+            data: frameData,
             events: [],
           }),
         );
@@ -80,12 +91,9 @@ export class FfmpegDriver extends BaseDriver {
     });
   }
 
-  /**
-   * Kills the ffmpeg process and clears the internal buffer.
-   */
   stop(): void {
     this.process?.kill('SIGTERM');
     this.process = undefined;
-    this.buffer = Buffer.alloc(0);
+    this.accumFill = 0;
   }
 }

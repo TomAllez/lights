@@ -21,3 +21,16 @@
 - The `nx-generate` skill handles generator discovery internally - don't call nx_docs just to look up generator syntax
 
 <!-- nx configuration end-->
+
+## Benchmarking
+
+The project has a performance benchmark harness at `packages/ts/bench/` (`@lights/bench`).
+
+- **Run:** `yarn nx run @lights/bench:bench`
+- **Files:** `src/*.bench.ts` — vitest bench format
+  - `frame-copy.bench.ts` — buffer accumulation patterns + frame copy cost
+  - `graph-throughput.bench.ts` — RxJS DAG throughput (frames/sec)
+  - `python-ipc.bench.ts` — Python subprocess round-trip + MediaPipe inference latency
+- **Echo script:** `packages/py/echo/main.py` — minimal Python IPC echo for isolating serialization from inference
+- Requires Python 3 on PATH; `python-ipc.bench.ts` additionally requires `pip install mediapipe numpy`
+- Always run the bench before and after touching the frame pipeline hot path to verify no regression

@@ -1,0 +1,26 @@
+{
+  "name": "@lights/bench",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "name": "@lights/bench",
+    "targets": {
+      "bench": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "yarn vitest bench --run",
+          "cwd": "{projectRoot}"
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "@lights/io": "*",
+    "@lights/graph": "*",
+    "@lights/driver": "*",
+    "@lights/module": "*",
+    "@lights/renderer": "*",
+    "@lights/python-module": "*"
+  }
+}

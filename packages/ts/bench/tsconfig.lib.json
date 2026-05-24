@@ -1,0 +1,20 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
+    "emitDeclarationOnly": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../../lib/io" },
+    { "path": "../../../lib/graph" },
+    { "path": "../../../lib/driver" },
+    { "path": "../../../lib/module" },
+    { "path": "../../../lib/renderer" },
+    { "path": "../modules/python-module" }
+  ]
+}
