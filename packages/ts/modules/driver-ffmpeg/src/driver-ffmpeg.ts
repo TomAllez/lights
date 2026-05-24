@@ -82,10 +82,17 @@ export class FfmpegDriver extends BaseDriver {
 
   /**
    * Kills the ffmpeg process and clears the internal buffer.
+   * Sends SIGTERM first; if the process has not exited within 2 s
+   * (e.g. while avfoundation holds the camera device), escalates to SIGKILL.
    */
   stop(): void {
-    this.process?.kill('SIGTERM');
+    const proc = this.process;
     this.process = undefined;
     this.buffer = Buffer.alloc(0);
+    if (!proc) return;
+
+    proc.kill('SIGTERM');
+    const forceKill = setTimeout(() => { if (!proc.killed) proc.kill('SIGKILL'); }, 2000);
+    proc.once('exit', () => clearTimeout(forceKill));
   }
 }
