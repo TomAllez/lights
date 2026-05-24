@@ -6,7 +6,7 @@
   <title>Marseille Fishing Spots</title>
 
   <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="vendor/leaflet.css" />
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -456,9 +456,17 @@
 </div>
 
 <!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="vendor/leaflet.js"></script>
 
 <script>
+// Fix Leaflet default icon paths for local vendor directory
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'vendor/images/marker-icon-2x.png',
+  iconUrl: 'vendor/images/marker-icon.png',
+  shadowUrl: 'vendor/images/marker-shadow.png',
+});
+
 // ── Data ─────────────────────────────────────────────────────────────────────
 const SPOTS = [
   {
