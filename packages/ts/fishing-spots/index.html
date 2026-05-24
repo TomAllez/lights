@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marseille Fishing Spots</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue-deep:   #0a2342;
+      --blue-mid:    #1a4a7a;
+      --blue-light:  #2e86c1;
+      --teal:        #17a589;
+      --gold:        #f0b429;
+      --sand:        #f9f3e8;
+      --text:        #1a2a3a;
+      --muted:       #6b7f8e;
+      --white:       #ffffff;
+      --shadow:      0 4px 20px rgba(0,0,0,0.12);
+      --radius:      12px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--sand);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, var(--blue-deep) 0%, var(--blue-mid) 100%);
+      color: var(--white);
+      padding: 0 24px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+      flex-shrink: 0;
+      z-index: 1000;
+    }
+
+    .header-icon { font-size: 28px; }
+
+    .header-text h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .header-text p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.65);
+      margin-top: 1px;
+    }
+
+    .header-badge {
+      margin-left: auto;
+      background: var(--gold);
+      color: var(--blue-deep);
+      font-weight: 700;
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    /* ── Layout ── */
+    .app-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 340px;
+      background: var(--white);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+      z-index: 100;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #e8eef3;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--sand);
+      border: 1.5px solid #d0dbe5;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      transition: border-color 0.2s;
+    }
+
+    .search-box:focus-within { border-color: var(--blue-light); }
+
+    .search-box input {
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 14px;
+      flex: 1;
+      color: var(--text);
+    }
+
+    .search-icon { color: var(--muted); font-size: 14px; }
+
+    .filter-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      border: 1.5px solid #d0dbe5;
+      background: var(--white);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: var(--muted);
+    }
+
+    .filter-btn:hover { border-color: var(--blue-light); color: var(--blue-light); }
+
+    .filter-btn.active {
+      background: var(--blue-light);
+      border-color: var(--blue-light);
+      color: var(--white);
+    }
+
+    /* ── Spots list ── */
+    .spots-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .spots-list::-webkit-scrollbar { width: 4px; }
+    .spots-list::-webkit-scrollbar-thumb { background: #c8d6e0; border-radius: 2px; }
+
+    .spot-card {
+      margin: 6px 12px;
+      border-radius: var(--radius);
+      border: 1.5px solid #e8eef3;
+      background: var(--white);
+      cursor: pointer;
+      transition: all 0.18s;
+      overflow: hidden;
+    }
+
+    .spot-card:hover {
+      border-color: var(--blue-light);
+      box-shadow: 0 4px 16px rgba(46,134,193,0.12);
+      transform: translateY(-1px);
+    }
+
+    .spot-card.selected {
+      border-color: var(--blue-light);
+      box-shadow: 0 0 0 3px rgba(46,134,193,0.15);
+    }
+
+    .spot-card-inner { padding: 12px 14px; }
+
+    .spot-card-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .spot-emoji { font-size: 26px; flex-shrink: 0; }
+
+    .spot-info { flex: 1; min-width: 0; }
+
+    .spot-name {
+      font-weight: 600;
+      font-size: 14px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .spot-type {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .spot-rating {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 12px;
+      color: var(--gold);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .spot-tags {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .tag {
+      background: #eaf3fa;
+      color: var(--blue-mid);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      letter-spacing: 0.3px;
+    }
+
+    .tag.species { background: #e8f8f5; color: var(--teal); }
+
+    .spot-meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .meta-item { display: flex; align-items: center; gap: 3px; }
+
+    /* ── Map ── */
+    #map {
+      flex: 1;
+      z-index: 1;
+    }
+
+    /* ── Detail panel ── */
+    .detail-panel {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      width: 300px;
+      background: var(--white);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 500;
+      overflow: hidden;
+      transform: translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .detail-panel.visible {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .detail-header {
+      background: linear-gradient(135deg, var(--blue-mid), var(--blue-light));
+      color: var(--white);
+      padding: 16px 20px;
+    }
+
+    .detail-header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .detail-title { font-size: 16px; font-weight: 700; }
+
+    .detail-close {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+
+    .detail-close:hover { background: rgba(255,255,255,0.35); }
+
+    .detail-subtitle {
+      font-size: 12px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+
+    .detail-body { padding: 16px 20px; }
+
+    .detail-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 0;
+      border-bottom: 1px solid #f0f4f7;
+      font-size: 13px;
+    }
+
+    .detail-row:last-child { border-bottom: none; }
+
+    .detail-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+
+    .detail-label { color: var(--muted); font-size: 11px; }
+    .detail-value { color: var(--text); font-weight: 500; }
+
+    .detail-section { margin-top: 4px; }
+    .detail-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .species-list {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .species-pill {
+      background: #e8f8f5;
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    /* ── Leaflet popup override ── */
+    .leaflet-popup-content-wrapper {
+      border-radius: 10px !important;
+      box-shadow: var(--shadow) !important;
+    }
+
+    .popup-content { padding: 4px; }
+    .popup-name { font-weight: 700; font-size: 14px; color: var(--blue-deep); }
+    .popup-type { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .popup-rating { color: var(--gold); font-weight: 600; font-size: 12px; margin-top: 4px; }
+
+    /* ── Custom marker ── */
+    .custom-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      background: var(--blue-mid);
+      border: 3px solid var(--white);
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+      font-size: 16px;
+      transition: transform 0.15s;
+    }
+
+    .custom-marker span { transform: rotate(45deg); display: block; }
+
+    .custom-marker.selected {
+      background: var(--gold);
+      width: 42px;
+      height: 42px;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      padding: 8px 20px;
+      background: var(--sand);
+      border-top: 1px solid #e8eef3;
+      display: flex;
+      gap: 16px;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .stat { display: flex; align-items: center; gap: 4px; }
+    .stat span { color: var(--blue-mid); font-weight: 700; }
+
+    .no-results {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .no-results .no-results-icon { font-size: 40px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-icon">🎣</div>
+  <div class="header-text">
+    <h1>Marseille Fishing Spots</h1>
+    <p>Discover the best spots along the Côte Bleue & Calanques</p>
+  </div>
+  <div class="header-badge" id="spot-count">19 spots</div>
+</header>
+
+<div class="app-body">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="search-input" placeholder="Search spots, species…" />
+      </div>
+      <div class="filter-row" id="filter-row">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="rocky">Rocky</button>
+        <button class="filter-btn" data-filter="pier">Pier</button>
+        <button class="filter-btn" data-filter="beach">Beach</button>
+        <button class="filter-btn" data-filter="boat">Boat</button>
+        <button class="filter-btn" data-filter="calanque">Calanque</button>
+      </div>
+    </div>
+
+    <div class="spots-list" id="spots-list"></div>
+
+    <div class="stats-bar">
+      <div class="stat">🗺️ Showing <span id="shown-count">19</span> spots</div>
+      <div class="stat">🐟 <span>9</span> species</div>
+      <div class="stat">⭐ avg <span>4.1</span></div>
+    </div>
+  </aside>
+
+  <div style="position:relative;flex:1;">
+    <div id="map"></div>
+    <div class="detail-panel" id="detail-panel"></div>
+  </div>
+</div>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────────────
+const SPOTS = [
+  {
+    id: 1, name: "Anse des Catalans", type: "beach",
+    lat: 43.2880, lng: 5.3568, rating: 4.2,
+    emoji: "🏖️", difficulty: "Beginner", access: "Public",
+    bestSeason: "Spring–Autumn", bestTime: "Dawn & Dusk",
+    depth: "1–5 m", technique: "Float, Bottom",
+    species: ["Bream", "Mullet", "Eel"],
+    description: "Sandy beach near the city centre, easily accessible. Great for families learning to fish.",
+    tips: "Use bread crust bait for mullet near the rocks on the right side."
+  },
+  {
+    id: 2, name: "Vallon des Auffes", type: "rocky",
+    lat: 43.2907, lng: 5.3484, rating: 4.5,
+    emoji: "🪨", difficulty: "Intermediate", access: "Public",
+    bestSeason: "Year-round", bestTime: "Early Morning",
+    depth: "2–8 m", technique: "Rockfishing, Jigging",
+    species: ["Scorpionfish", "Wrasse", "Sea Bass"],
+    description: "Iconic rocky inlet with crystal-clear water. One of Marseille's most beloved fishing spots.",
+    tips: "Light jig heads (3–5g) with shrimp lures work best between the rocks."
+  },
+  {
+    id: 3, name: "Malmousque", type: "rocky",
+    lat: 43.2930, lng: 5.3430, rating: 4.3,
+    emoji: "🪨", difficulty: "Intermediate", access: "Public",
+    bestSeason: "Spring–Autumn", bestTime: "Morning",
+    depth: "3–12 m", technique: "Rockfishing, Float",
+    species: ["Scorpionfish", "Bream", "Wrasse"],
+    description: "Popular rocky peninsula with varied terrain. Excellent for rockfishing enthusiasts.",
+    tips: "Access from Malmousque cove; watch tide levels carefully."
+  },
+  {
+    id: 4, name: "Pointe Rouge (Pier)", type: "pier",
+    lat: 43.2436, lng: 5.3756, rating: 4.0,
+    emoji: "🚢", difficulty: "Beginner", access: "Public",
+    bestSeason: "Year-round", bestTime: "Evening",
+    depth: "2–6 m", technique: "Bottom, Float, Feeder",
+    species: ["Mullet", "Bream", "Garfish"],
+    description: "The long pier at Pointe Rouge marina offers comfortable fishing with great sunset views.",
+    tips: "Garfish are very active at the surface during summer evenings."
+  },
+  {
+    id: 5, name: "Calanque de Morgiou", type: "calanque",
+    lat: 43.2168, lng: 5.4364, rating: 4.8,
+    emoji: "⛰️", difficulty: "Advanced", access: "Seasonal",
+    bestSeason: "Spring–Summer", bestTime: "Morning",
+    depth: "5–30 m", technique: "Jigging, Bottom, Spinning",
+    species: ["Sea Bass", "Grouper", "Dentex"],
+    description: "Breathtaking calanque with deep clear waters. Best reached by boat or a long hike.",
+    tips: "Boat access opens up deeper zones where grouper congregate."
+  },
+  {
+    id: 6, name: "Calanque de Sugiton", type: "calanque",
+    lat: 43.2111, lng: 5.4588, rating: 4.7,
+    emoji: "⛰️", difficulty: "Advanced", access: "Restricted (hike)",
+    bestSeason: "Spring", bestTime: "Dawn",
+    depth: "5–25 m", technique: "Spinning, Jigging",
+    species: ["Sea Bass", "Bream", "Wrasse"],
+    description: "Remote and wild calanque requiring a 1-hour hike. Reward: near-pristine fishing.",
+    tips: "Access may be restricted in summer — check with Parc National des Calanques."
+  },
+  {
+    id: 7, name: "L'Estaque Breakwater", type: "pier",
+    lat: 43.3726, lng: 5.3108, rating: 3.9,
+    emoji: "🚢", difficulty: "Beginner", access: "Public",
+    bestSeason: "Autumn–Winter", bestTime: "Any",
+    depth: "3–8 m", technique: "Bottom, Feeder, Float",
+    species: ["Mullet", "Bream", "Blenny"],
+    description: "Industrial port breakwater north of Marseille. Less scenic but productive, especially in cooler months.",
+    tips: "Bloodworm or mussel bait works well here all year."
+  },
+  {
+    id: 8, name: "Côte Bleue – Carry-le-Rouet", type: "rocky",
+    lat: 43.3302, lng: 5.1535, rating: 4.6,
+    emoji: "🪨", difficulty: "Intermediate", access: "Public",
+    bestSeason: "Spring–Autumn", bestTime: "Morning",
+    depth: "2–15 m", technique: "Rockfishing, Spinning",
+    species: ["Sea Bass", "Scorpionfish", "Dentex"],
+    description: "Côte Bleue marine reserve edge — exceptional biodiversity. Rocky coastline stretching for kilometres.",
+    tips: "Fishing allowed outside the reserve boundary; check marine reserve map."
+  },
+  {
+    id: 9, name: "Île du Frioul", type: "rocky",
+    lat: 43.2766, lng: 5.2989, rating: 4.9,
+    emoji: "🏝️", difficulty: "Advanced", access: "Boat (ferry)",
+    bestSeason: "Spring–Autumn", bestTime: "Morning & Evening",
+    depth: "5–40 m", technique: "Spinning, Jigging, Bottom",
+    species: ["Dentex", "Grouper", "Sea Bass", "Bream"],
+    description: "The islands off Marseille offer world-class fishing in protected waters. Ferry from Vieux-Port.",
+    tips: "North side of Ratonneau offers deep water close to shore — try heavy jigs."
+  },
+  {
+    id: 10, name: "Calanque d'En-Vau", type: "calanque",
+    lat: 43.2037, lng: 5.4981, rating: 4.7,
+    emoji: "⛰️", difficulty: "Advanced", access: "Boat or hike",
+    bestSeason: "Spring", bestTime: "Dawn",
+    depth: "10–50 m", technique: "Jigging, Bottom",
+    species: ["Grouper", "Dentex", "Sea Bass"],
+    description: "One of the most spectacular calanques. Sheer white limestone cliffs plunge into turquoise depths.",
+    tips: "Only accessible by boat in summer; spectacular drop-offs near cliff bases."
+  },
+  {
+    id: 11, name: "Vieux-Port Quay", type: "pier",
+    lat: 43.2951, lng: 5.3750, rating: 3.5,
+    emoji: "🚢", difficulty: "Beginner", access: "Public",
+    bestSeason: "Year-round", bestTime: "Evening",
+    depth: "1–4 m", technique: "Float, Feeder",
+    species: ["Mullet", "Blenny"],
+    description: "Marseille's famous old port. Not the most productive but great atmosphere and easy access.",
+    tips: "Best near the ferry quay in the evening when mullet gather under the lights."
+  },
+  {
+    id: 12, name: "Plage du Prado (Rocks)", type: "rocky",
+    lat: 43.2607, lng: 5.3804, rating: 4.0,
+    emoji: "🪨", difficulty: "Beginner", access: "Public",
+    bestSeason: "Summer–Autumn", bestTime: "Dawn",
+    depth: "1–6 m", technique: "Rockfishing, Float",
+    species: ["Bream", "Wrasse", "Mullet"],
+    description: "Artificial rocky reefs along the Prado seafront create good habitat. Very accessible from the city.",
+    tips: "The rocky jetties at each end hold bream; fish with small jigs or float."
+  },
+  {
+    id: 13, name: "Ensues-la-Redonne", type: "rocky",
+    lat: 43.3492, lng: 5.1794, rating: 4.4,
+    emoji: "🪨", difficulty: "Intermediate", access: "Public",
+    bestSeason: "Spring–Autumn", bestTime: "Morning",
+    depth: "2–10 m", technique: "Rockfishing, Spinning",
+    species: ["Scorpionfish", "Bream", "Sea Bass"],
+    description: "Quiet village on the Côte Bleue with excellent rocky coastline fishing.",
+    tips: "Park in the village and walk to the cliffs — many untouched spots."
+  },
+  {
+    id: 14, name: "Sausset-les-Pins Pier", type: "pier",
+    lat: 43.3289, lng: 5.1093, rating: 4.1,
+    emoji: "🚢", difficulty: "Beginner", access: "Public",
+    bestSeason: "Year-round", bestTime: "Evening",
+    depth: "2–7 m", technique: "Bottom, Float, Feeder",
+    species: ["Bream", "Mullet", "Garfish"],
+    description: "Charming village pier west of Marseille. Reliable bream fishing in a scenic setting.",
+    tips: "Try feeder fishing with mussel on the outer end of the pier."
+  },
+  {
+    id: 15, name: "Calanque de Callelongue", type: "calanque",
+    lat: 43.2119, lng: 5.3479, rating: 4.3,
+    emoji: "⛰️", difficulty: "Intermediate", access: "Public (road)",
+    bestSeason: "Spring–Summer", bestTime: "Early Morning",
+    depth: "3–15 m", technique: "Rockfishing, Spinning",
+    species: ["Sea Bass", "Bream", "Wrasse"],
+    description: "Southernmost point of Marseille accessible by road. Gateway to the Calanques park.",
+    tips: "Fish the rocky headlands on either side of the small harbour."
+  },
+  {
+    id: 16, name: "Côte Bleue – Niolon", type: "boat",
+    lat: 43.3617, lng: 5.2256, rating: 4.8,
+    emoji: "⚓", difficulty: "Advanced", access: "Boat",
+    bestSeason: "Spring–Autumn", bestTime: "Morning",
+    depth: "20–80 m", technique: "Trolling, Jigging, Deep bottom",
+    species: ["Dentex", "Grouper", "Amberjack", "Bluefin (seasonal)"],
+    description: "Open water off Niolon offers serious offshore fishing opportunities.",
+    tips: "Check weather carefully — open sea conditions can deteriorate fast."
+  },
+  {
+    id: 17, name: "Plage du Roucas Blanc", type: "beach",
+    lat: 43.2750, lng: 5.3627, rating: 3.7,
+    emoji: "🏖️", difficulty: "Beginner", access: "Public",
+    bestSeason: "Autumn–Winter", bestTime: "Dawn",
+    depth: "1–4 m", technique: "Surf casting, Float",
+    species: ["Mullet", "Eel", "Bream"],
+    description: "Urban beach just south of Malmousque. Surf casting spot particularly productive in autumn.",
+    tips: "Eel fishing at night with worm bait near rocky edges can be rewarding."
+  },
+  {
+    id: 18, name: "Ile Ratonneau West Cliffs", type: "rocky",
+    lat: 43.2826, lng: 5.2889, rating: 4.6,
+    emoji: "🏝️", difficulty: "Advanced", access: "Ferry + walk",
+    bestSeason: "Spring–Summer", bestTime: "Morning",
+    depth: "8–30 m", technique: "Spinning, Jigging",
+    species: ["Dentex", "Grouper", "Sea Bass"],
+    description: "Wild western cliffs of Ratonneau island — one of Marseille's secret gems.",
+    tips: "30-min walk from the ferry landing; reward is near-deserted fishing."
+  },
+  {
+    id: 19, name: "Carro (Côte Bleue)", type: "pier",
+    lat: 43.3265, lng: 5.0388, rating: 4.2,
+    emoji: "🚢", difficulty: "Beginner", access: "Public",
+    bestSeason: "Year-round", bestTime: "Evening",
+    depth: "2–8 m", technique: "Bottom, Float, Feeder",
+    species: ["Bream", "Mullet", "Blenny"],
+    description: "Westernmost point in our area — charming fishing village with a lovely pier.",
+    tips: "Fresh cuttlefish makes excellent bait available from local fish stalls."
+  }
+];
+
+const DIFFICULTY_COLOR = { Beginner: '#27ae60', Intermediate: '#f39c12', Advanced: '#e74c3c' };
+const STARS = n => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
+
+// ── State ────────────────────────────────────────────────────────────────────
+let activeFilter = 'all';
+let searchText = '';
+let selectedId = null;
+let markers = {};
+
+// ── Map setup ────────────────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: [43.2808, 5.3632],
+  zoom: 12,
+  zoomControl: true
+});
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+  maxZoom: 19
+}).addTo(map);
+
+// ── Filtered spots ───────────────────────────────────────────────────────────
+function filteredSpots() {
+  return SPOTS.filter(s => {
+    const matchFilter = activeFilter === 'all' || s.type === activeFilter;
+    const q = searchText.toLowerCase();
+    const matchSearch = !q || s.name.toLowerCase().includes(q)
+      || s.type.toLowerCase().includes(q)
+      || s.species.some(sp => sp.toLowerCase().includes(q))
+      || s.description.toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+}
+
+// ── Marker icon ──────────────────────────────────────────────────────────────
+function markerIcon(spot, selected = false) {
+  const size = selected ? 44 : 36;
+  const bg = selected ? '#f0b429' : '#1a4a7a';
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      background:${bg};border:3px solid #fff;
+      border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+      box-shadow:0 3px 10px rgba(0,0,0,0.3);
+      display:flex;align-items:center;justify-content:center;
+      font-size:${selected?18:15}px;
+    "><span style="transform:rotate(45deg)">${spot.emoji}</span></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size]
+  });
+}
+
+// ── Render markers ───────────────────────────────────────────────────────────
+function renderMarkers() {
+  const visible = new Set(filteredSpots().map(s => s.id));
+
+  SPOTS.forEach(spot => {
+    if (visible.has(spot.id)) {
+      if (!markers[spot.id]) {
+        const m = L.marker([spot.lat, spot.lng], { icon: markerIcon(spot) })
+          .addTo(map)
+          .bindPopup(`
+            <div class="popup-content">
+              <div class="popup-name">${spot.emoji} ${spot.name}</div>
+              <div class="popup-type">${spot.type.charAt(0).toUpperCase() + spot.type.slice(1)} fishing</div>
+              <div class="popup-rating">${STARS(spot.rating)} ${spot.rating}</div>
+            </div>
+          `, { maxWidth: 200 });
+        m.on('click', () => selectSpot(spot.id));
+        markers[spot.id] = m;
+      }
+    } else {
+      if (markers[spot.id]) {
+        map.removeLayer(markers[spot.id]);
+        delete markers[spot.id];
+      }
+    }
+  });
+}
+
+// ── Render sidebar ───────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('spots-list');
+  const spots = filteredSpots();
+
+  document.getElementById('shown-count').textContent = spots.length;
+  document.getElementById('spot-count').textContent = `${spots.length} spot${spots.length !== 1 ? 's' : ''}`;
+
+  if (spots.length === 0) {
+    list.innerHTML = `<div class="no-results">
+      <div class="no-results-icon">🔍</div>
+      No spots found. Try a different filter or search term.
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = spots.map(spot => `
+    <div class="spot-card ${selectedId === spot.id ? 'selected' : ''}" data-id="${spot.id}">
+      <div class="spot-card-inner">
+        <div class="spot-card-header">
+          <div class="spot-emoji">${spot.emoji}</div>
+          <div class="spot-info">
+            <div class="spot-name">${spot.name}</div>
+            <div class="spot-type">${spot.type.charAt(0).toUpperCase() + spot.type.slice(1)} · ${spot.difficulty}</div>
+          </div>
+          <div class="spot-rating">★ ${spot.rating}</div>
+        </div>
+        <div class="spot-tags">
+          ${spot.species.slice(0, 3).map(sp => `<span class="tag species">${sp}</span>`).join('')}
+          <span class="tag">${spot.access}</span>
+        </div>
+        <div class="spot-meta">
+          <div class="meta-item">🕐 ${spot.bestTime}</div>
+          <div class="meta-item">📏 ${spot.depth}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.spot-card').forEach(card => {
+    card.addEventListener('click', () => selectSpot(parseInt(card.dataset.id)));
+  });
+}
+
+// ── Detail panel ─────────────────────────────────────────────────────────────
+function renderDetail(spot) {
+  const panel = document.getElementById('detail-panel');
+  if (!spot) {
+    panel.classList.remove('visible');
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <div class="detail-header-top">
+        <div class="detail-title">${spot.emoji} ${spot.name}</div>
+        <button class="detail-close" id="detail-close">✕</button>
+      </div>
+      <div class="detail-subtitle">${STARS(spot.rating)} ${spot.rating} · ${spot.type.charAt(0).toUpperCase() + spot.type.slice(1)} fishing</div>
+    </div>
+    <div class="detail-body">
+      <div class="detail-row">
+        <div class="detail-icon">🎯</div>
+        <div><div class="detail-label">Difficulty</div>
+        <div class="detail-value" style="color:${DIFFICULTY_COLOR[spot.difficulty]}">${spot.difficulty}</div></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-icon">🗓️</div>
+        <div><div class="detail-label">Best Season</div>
+        <div class="detail-value">${spot.bestSeason}</div></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-icon">🕐</div>
+        <div><div class="detail-label">Best Time</div>
+        <div class="detail-value">${spot.bestTime}</div></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-icon">📏</div>
+        <div><div class="detail-label">Depth</div>
+        <div class="detail-value">${spot.depth}</div></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-icon">🪝</div>
+        <div><div class="detail-label">Techniques</div>
+        <div class="detail-value">${spot.technique}</div></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-icon">🚪</div>
+        <div><div class="detail-label">Access</div>
+        <div class="detail-value">${spot.access}</div></div>
+      </div>
+      <div class="detail-section" style="margin-top:12px">
+        <div class="detail-section-title">Target Species</div>
+        <div class="species-list">
+          ${spot.species.map(sp => `<span class="species-pill">🐟 ${sp}</span>`).join('')}
+        </div>
+      </div>
+      <div class="detail-section" style="margin-top:12px">
+        <div class="detail-section-title">Local Tip</div>
+        <div style="font-size:13px;color:#3d5a6e;font-style:italic;line-height:1.5">💡 ${spot.tips}</div>
+      </div>
+    </div>
+  `;
+
+  panel.classList.add('visible');
+  document.getElementById('detail-close').addEventListener('click', () => {
+    selectedId = null;
+    renderSidebar();
+    renderMarkers();
+    renderDetail(null);
+  });
+}
+
+// ── Select spot ───────────────────────────────────────────────────────────────
+function selectSpot(id) {
+  selectedId = id;
+  const spot = SPOTS.find(s => s.id === id);
+
+  // Update marker icons
+  Object.entries(markers).forEach(([sid, m]) => {
+    const s = SPOTS.find(x => x.id === parseInt(sid));
+    m.setIcon(markerIcon(s, parseInt(sid) === id));
+  });
+
+  // Pan map
+  map.flyTo([spot.lat, spot.lng], Math.max(map.getZoom(), 13), { duration: 0.8 });
+
+  // Scroll sidebar card into view
+  renderSidebar();
+  const card = document.querySelector(`.spot-card[data-id="${id}"]`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  renderDetail(spot);
+}
+
+// ── Filters & search ─────────────────────────────────────────────────────────
+document.getElementById('filter-row').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  activeFilter = btn.dataset.filter;
+  selectedId = null;
+  renderDetail(null);
+  renderSidebar();
+  renderMarkers();
+});
+
+document.getElementById('search-input').addEventListener('input', e => {
+  searchText = e.target.value;
+  selectedId = null;
+  renderDetail(null);
+  renderSidebar();
+  renderMarkers();
+});
+
+// ── Initial render ────────────────────────────────────────────────────────────
+renderSidebar();
+renderMarkers();
+</script>
+</body>
+</html>
