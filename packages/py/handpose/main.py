@@ -20,13 +20,13 @@ import mediapipe as mp
 from lights_core import cli, frame, ipc
 
 
-def encode_hand_event(handedness_label: str, landmarks) -> list[int]:
-    """Pack hand data as bytes: 1 byte handedness + 21×3 float32 landmarks."""
+def encode_hand_event(handedness_label: str, landmarks) -> dict:
+    """Pack hand data as a base64 event: 1 byte handedness + 21×3 float32 landmarks."""
     buf = bytearray()
     buf.append(1 if handedness_label == 'Right' else 0)
     for lm in landmarks:
         buf.extend(struct.pack('<fff', lm.x, lm.y, lm.z))
-    return list(buf)
+    return ipc.encode_binary_event('handpose', bytes(buf))
 
 
 def main():
@@ -58,10 +58,7 @@ def main():
                     detection.multi_handedness,
                 ):
                     label = handedness.classification[0].label
-                    events.append({
-                        'type': 'handpose',
-                        'data': encode_hand_event(label, lm_set.landmark),
-                    })
+                    events.append(encode_hand_event(label, lm_set.landmark))
 
         ipc.write_response(sys.stdout, events)
 

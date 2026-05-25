@@ -19,12 +19,12 @@ import mediapipe as mp
 from lights_core import cli, frame, ipc
 
 
-def encode_face_event(landmarks) -> list[int]:
-    """Pack face landmarks as bytes: 468 × 3 float32 LE (x, y, z)."""
+def encode_face_event(landmarks) -> dict:
+    """Pack face landmarks as a base64 event: 468 × 3 float32 LE (x, y, z)."""
     buf = bytearray()
     for lm in landmarks:
         buf.extend(struct.pack('<fff', lm.x, lm.y, lm.z))
-    return list(buf)
+    return ipc.encode_binary_event('facemesh', bytes(buf))
 
 
 def main():
@@ -53,10 +53,7 @@ def main():
             detection = face_mesh.process(video)
             if detection.multi_face_landmarks:
                 for face_landmarks in detection.multi_face_landmarks:
-                    events.append({
-                        'type': 'facemesh',
-                        'data': encode_face_event(face_landmarks.landmark),
-                    })
+                    events.append(encode_face_event(face_landmarks.landmark))
 
         ipc.write_response(sys.stdout, events)
 

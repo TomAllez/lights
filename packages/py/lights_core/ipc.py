@@ -1,3 +1,4 @@
+import base64
 import json
 import struct
 import sys
@@ -13,6 +14,11 @@ def read_message(stdin) -> tuple[dict, bytes] | None:
     total_size = sum(p['size'] for p in header['metadata'].values())
     raw = stdin.buffer.read(total_size)
     return header, raw
+
+
+def encode_binary_event(event_type: str, data: bytes) -> dict:
+    """Encode a binary event payload as base64, cutting stdout size by ~60%."""
+    return {'type': event_type, 'data': base64.b64encode(data).decode('ascii')}
 
 
 def write_response(stdout, events: list[dict]) -> None:
