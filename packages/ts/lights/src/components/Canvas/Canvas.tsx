@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import * as THREE from 'three';
 import { useProject, useGraph } from '../../contexts';
 import { buildSurfaceMesh, buildLiveSurfaceMesh, disposeSurfaceMesh, preloadSurfaces, buildShapeMesh, disposeShapeMesh } from '@lights/three-scene';
@@ -24,7 +25,8 @@ interface LiveEntry {
   renderers: Map<string, DetectionCanvasRenderer>
 }
 
-export default function Canvas({ showVideo }: { showVideo: boolean }) {
+export default function Canvas() {
+  const [showVideo, setShowVideo] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
   const renderRef = useRef<() => void>(() => {});
   const surfaceGroupRef = useRef<THREE.Group | null>(null);
@@ -298,5 +300,15 @@ export default function Canvas({ showVideo }: { showVideo: boolean }) {
     return () => sub.unsubscribe();
   }, [typedDetection$]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }} />;
+  return (
+    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <button
+        className={`canvas-video-toggle${showVideo ? '' : ' off'}`}
+        title={showVideo ? 'Hide video' : 'Show video'}
+        onClick={() => setShowVideo(v => !v)}
+      >
+        {showVideo ? <Eye size={14} /> : <EyeOff size={14} />}
+      </button>
+    </div>
+  );
 }

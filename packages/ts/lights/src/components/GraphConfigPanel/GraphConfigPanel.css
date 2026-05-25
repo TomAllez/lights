@@ -1,13 +1,13 @@
 .graph-config-panel {
-  border-top: 1px solid #1a1a1a;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
 }
 
 .graph-config-header {
-  padding: 14px 12px 10px;
-  font-size: 10px;
-  color: #555;
+  padding: 14px var(--sp-3) 10px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -15,7 +15,7 @@
 .graph-module-list {
   display: flex;
   flex-direction: column;
-  padding: 0 8px 8px;
+  padding: 0 var(--sp-2) var(--sp-2);
   gap: 2px;
 }
 
@@ -23,8 +23,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 6px 8px;
-  border-radius: 4px;
+  padding: 6px var(--sp-2);
+  border-radius: var(--radius-md);
 }
 
 .graph-module.disabled {
@@ -38,8 +38,8 @@
 }
 
 .graph-module-label {
-  font-size: 12px;
-  color: #aaa;
+  font-size: var(--text-base);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -47,10 +47,10 @@
 
 .graph-module-badge {
   font-size: 9px;
-  color: #555;
-  background: #1a1a1a;
-  border-radius: 3px;
-  padding: 1px 4px;
+  color: var(--text-muted);
+  background: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1px var(--sp-1);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
@@ -59,8 +59,8 @@
   position: relative;
   width: 28px;
   height: 15px;
-  background: #2a2a2a;
-  border-radius: 8px;
+  background: var(--border-strong);
+  border-radius: var(--radius-lg);
   cursor: pointer;
   border: none;
   flex-shrink: 0;
@@ -74,7 +74,7 @@
   left: 2px;
   width: 11px;
   height: 11px;
-  background: #555;
+  background: var(--text-muted);
   border-radius: 50%;
   transition:
     transform 0.15s,
@@ -82,12 +82,12 @@
 }
 
 .graph-toggle.on {
-  background: #1a2744;
+  background: var(--accent-dim);
 }
 
 .graph-toggle.on::after {
   transform: translateX(13px);
-  background: #60a5fa;
+  background: var(--accent);
 }
 
 .graph-toggle:disabled {
@@ -97,18 +97,18 @@
 .graph-module-params {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--sp-1);
 }
 
 .graph-param-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
 }
 
 .graph-param-label {
-  font-size: 10px;
-  color: #555;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   min-width: 56px;
@@ -117,12 +117,12 @@
 .graph-param-slider {
   flex: 1;
   min-width: 0;
-  accent-color: #60a5fa;
+  accent-color: var(--accent);
 }
 
 .graph-param-value {
-  font-size: 10px;
-  color: #555;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
   min-width: 28px;
   text-align: right;
 }
