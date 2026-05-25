@@ -1,7 +1,22 @@
 import './SlidePanel.css'
 import { useState } from 'react'
-import { Copy, Trash2 } from 'lucide-react'
+import { Copy, Layers, Trash2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useProject } from '../../contexts'
+
+function EmptyState({ icon: Icon, message, action }: {
+  icon: LucideIcon
+  message: string
+  action?: { label: string; onClick: () => void }
+}) {
+  return (
+    <div className="empty-state">
+      <Icon size={20} className="empty-state-icon" />
+      <span className="empty-state-msg">{message}</span>
+      {action && <button className="empty-state-btn" onClick={action.onClick}>{action.label}</button>}
+    </div>
+  )
+}
 
 export default function SlidePanel() {
   const { state, dispatch } = useProject()
@@ -28,6 +43,13 @@ export default function SlidePanel() {
       </div>
 
       <div className="slide-list">
+        {project.slides.length === 0 && (
+          <EmptyState
+            icon={Layers}
+            message="No slides yet"
+            action={{ label: '+ New Slide', onClick: () => dispatch({ type: 'slide:add' }) }}
+          />
+        )}
         {project.slides.map(slide => {
           const isSelected = slide.id === selectedSlideId
           const isEditing = editingId === slide.id

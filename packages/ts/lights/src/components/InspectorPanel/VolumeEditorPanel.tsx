@@ -1,7 +1,22 @@
 import './InspectorPanel.css'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Box } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useProject } from '../../contexts'
 import type { VolumeShapeType } from '../../model/types'
+
+function EmptyState({ icon: Icon, message, action }: {
+  icon: LucideIcon
+  message: string
+  action?: { label: string; onClick: () => void }
+}) {
+  return (
+    <div className="empty-state">
+      <Icon size={20} className="empty-state-icon" />
+      <span className="empty-state-msg">{message}</span>
+      {action && <button className="empty-state-btn" onClick={action.onClick}>{action.label}</button>}
+    </div>
+  )
+}
 
 const SHAPE_TYPES: VolumeShapeType[] = ['box', 'sphere', 'cylinder', 'cone', 'grid']
 
@@ -35,7 +50,7 @@ export default function VolumeEditorPanel() {
         <div className="panel-section-body">
           <div className="shape-list">
             {shapes.length === 0 ? (
-              <p className="panel-empty">No shapes</p>
+              <EmptyState icon={Box} message="No shapes" />
             ) : (
               shapes.map(sh => (
                 <div

@@ -1,5 +1,5 @@
 import './InspectorPanel.css'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { Scan } from 'lucide-react'
 import { useProject } from '../../contexts'
 import type { DetectionCanvasLayer, SolidLayer, TextLayer } from '../../model/types'
@@ -12,6 +12,8 @@ export default function SurfaceModePanel() {
   const [editingName, setEditingName] = useState(false)
   const [editValue, setEditValue] = useState('')
   const [showEffectPicker, setShowEffectPicker] = useState(false)
+  const solidColorInputRef = useRef<HTMLInputElement>(null)
+  const textColorInputRef = useRef<HTMLInputElement>(null)
 
   const slide = project.slides.find(s => s.id === selectedSlideId)
   const surface = slide?.surfaces.find(s => s.id === selectedSurfaceId)
@@ -100,17 +102,26 @@ export default function SurfaceModePanel() {
       {solidLayer && (
         <div className="surface-editor">
           <label className="surface-editor-label">Fill</label>
-          <input
-            type="color"
-            className="surface-editor-color"
-            value={solidLayer.color}
-            onChange={e => dispatch({
-              type: 'layer:update',
-              slideId: selectedSlideId!,
-              surfaceId: surface!.id,
-              layer: { ...solidLayer, color: e.target.value },
-            })}
-          />
+          <div className="color-field">
+            <div
+              className="color-swatch"
+              style={{ background: solidLayer.color }}
+              onClick={() => solidColorInputRef.current?.click()}
+            />
+            <span className="color-value">{solidLayer.color}</span>
+            <input
+              ref={solidColorInputRef}
+              type="color"
+              className="color-input-hidden"
+              value={solidLayer.color}
+              onChange={e => dispatch({
+                type: 'layer:update',
+                slideId: selectedSlideId!,
+                surfaceId: surface!.id,
+                layer: { ...solidLayer, color: e.target.value },
+              })}
+            />
+          </div>
         </div>
       )}
 
@@ -148,31 +159,54 @@ export default function SurfaceModePanel() {
             })}
           />
           <label className="surface-editor-label">Font size</label>
-          <input
-            type="range"
-            min={8}
-            max={200}
-            value={textLayer.fontSize}
-            onChange={e => dispatch({
-              type: 'layer:update',
-              slideId: selectedSlideId!,
-              surfaceId: surface!.id,
-              layer: { ...textLayer, fontSize: Number(e.target.value) },
-            })}
-          />
-          <span className="surface-editor-value">{textLayer.fontSize}px</span>
+          <div className="prop-row">
+            <input
+              type="range"
+              min={8}
+              max={200}
+              value={textLayer.fontSize}
+              onChange={e => dispatch({
+                type: 'layer:update',
+                slideId: selectedSlideId!,
+                surfaceId: surface!.id,
+                layer: { ...textLayer, fontSize: Number(e.target.value) },
+              })}
+            />
+            <input
+              type="number"
+              className="prop-number"
+              min={8}
+              max={200}
+              value={textLayer.fontSize}
+              onChange={e => dispatch({
+                type: 'layer:update',
+                slideId: selectedSlideId!,
+                surfaceId: surface!.id,
+                layer: { ...textLayer, fontSize: Number(e.target.value) },
+              })}
+            />
+          </div>
           <label className="surface-editor-label">Color</label>
-          <input
-            type="color"
-            className="surface-editor-color"
-            value={textLayer.color}
-            onChange={e => dispatch({
-              type: 'layer:update',
-              slideId: selectedSlideId!,
-              surfaceId: surface!.id,
-              layer: { ...textLayer, color: e.target.value },
-            })}
-          />
+          <div className="color-field">
+            <div
+              className="color-swatch"
+              style={{ background: textLayer.color }}
+              onClick={() => textColorInputRef.current?.click()}
+            />
+            <span className="color-value">{textLayer.color}</span>
+            <input
+              ref={textColorInputRef}
+              type="color"
+              className="color-input-hidden"
+              value={textLayer.color}
+              onChange={e => dispatch({
+                type: 'layer:update',
+                slideId: selectedSlideId!,
+                surfaceId: surface!.id,
+                layer: { ...textLayer, color: e.target.value },
+              })}
+            />
+          </div>
         </div>
       )}
 

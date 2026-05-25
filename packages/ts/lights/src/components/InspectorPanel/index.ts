@@ -1,1 +1,1 @@
-export { default as InspectorPanel } from './InspectorPanel'
+export { default } from './InspectorPanel'

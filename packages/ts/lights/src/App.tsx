@@ -1,10 +1,10 @@
 import {
   Breadcrumb,
   Canvas,
+  InspectorPanel,
   SlidePanel,
   StageOverlay,
   SurfaceCanvas,
-  SurfacePanel,
   TopBar,
   VolumeAlignHUD,
   VolumeEditor,
@@ -36,7 +36,7 @@ export default function App() {
             )}
           </div>
         </div>
-        <SurfacePanel />
+        <InspectorPanel />
       </div>
     </div>
   );

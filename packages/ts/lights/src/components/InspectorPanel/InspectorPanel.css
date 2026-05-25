@@ -164,3 +164,8 @@
 .prop-row { display: flex; align-items: center; gap: var(--sp-2); }
 .prop-label { font-size: var(--text-xs); color: var(--text-muted); min-width: 40px; }
 .prop-number { width: 48px; text-align: right; background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text-primary); padding: 2px var(--sp-1); font-size: var(--text-sm); }
+
+.color-field { display: flex; align-items: center; gap: var(--sp-2); }
+.color-swatch { width: 20px; height: 20px; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid var(--border-strong); flex-shrink: 0; }
+.color-value { font-size: var(--text-sm); color: var(--text-secondary); font-family: monospace; }
+.color-input-hidden { opacity: 0; width: 0; height: 0; position: absolute; }

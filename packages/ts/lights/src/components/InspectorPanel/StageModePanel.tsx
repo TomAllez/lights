@@ -1,8 +1,23 @@
 import './InspectorPanel.css'
 import { useState } from 'react'
-import { Layers, Trash2, Pencil, Crosshair, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { Box, Layers, MousePointer, Square, Trash2, Pencil, Crosshair, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useProject } from '../../contexts'
 import GraphConfigPanel from '../GraphConfigPanel'
+
+function EmptyState({ icon: Icon, message, action }: {
+  icon: LucideIcon
+  message: string
+  action?: { label: string; onClick: () => void }
+}) {
+  return (
+    <div className="empty-state">
+      <Icon size={20} className="empty-state-icon" />
+      <span className="empty-state-msg">{message}</span>
+      {action && <button className="empty-state-btn" onClick={action.onClick}>{action.label}</button>}
+    </div>
+  )
+}
 
 interface PanelSectionProps {
   title: string
@@ -60,9 +75,13 @@ export default function StageModePanel() {
     <aside className="inspector-panel">
       <PanelSection title="SURFACES" action={surfaceAddButton}>
         {!selectedSlideId ? (
-          <p className="panel-empty">No slide selected</p>
+          <EmptyState icon={MousePointer} message="Select a slide to begin" />
         ) : surfaces.length === 0 ? (
-          <p className="panel-empty">No surfaces</p>
+          <EmptyState
+            icon={Square}
+            message="No surfaces"
+            action={{ label: 'Add Surface', onClick: () => dispatch({ type: 'surface:add', slideId: selectedSlideId! }) }}
+          />
         ) : (
           surfaces.map(s => (
             <div
@@ -71,7 +90,6 @@ export default function StageModePanel() {
               onClick={() => {
                 if (editingId !== s.id) dispatch({ type: 'surface:select', surfaceId: s.id })
               }}
-              onDoubleClick={e => startRename(s.id, s.name, e)}
             >
               <Layers size={12} />
               {editingId === s.id ? (
@@ -89,7 +107,12 @@ export default function StageModePanel() {
                   onClick={e => e.stopPropagation()}
                 />
               ) : (
-                <span className="inspector-surface-name">{s.name}</span>
+                <span
+                  className="inspector-surface-name"
+                  onDoubleClick={e => { e.stopPropagation(); startRename(s.id, s.name, e) }}
+                >
+                  {s.name}
+                </span>
               )}
               <button
                 className="icon-btn inspector-surface-remove"
@@ -149,7 +172,11 @@ export default function StageModePanel() {
             </button>
           </div>
         ) : selectedSlideId ? (
-          <p className="panel-empty">No volume</p>
+          <EmptyState
+            icon={Box}
+            message="No volume"
+            action={{ label: 'Add Volume', onClick: () => dispatch({ type: 'volume:add', slideId: selectedSlideId! }) }}
+          />
         ) : null}
       </PanelSection>
 
