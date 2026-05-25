@@ -13,8 +13,12 @@ export class InputPort {
 
   /**
    * Observable of frames received from the connected source.
+   * Always reflects the current internal Subject so that completing
+   * the Subject on disconnect() cleans up all downstream subscriptions.
    */
-  readonly stream$: Observable<Frame> = this._subject.asObservable();
+  get stream$(): Observable<Frame> {
+    return this._subject.asObservable();
+  }
 
   /**
    * Whether this port is currently connected to a source.
@@ -34,11 +38,16 @@ export class InputPort {
   }
 
   /**
-   * Disconnects from the current source, stopping frame delivery.
+   * Disconnects from the current source and completes the internal Subject,
+   * which causes all downstream subscriptions (e.g. in BaseModule/BaseRenderer
+   * constructors) to auto-complete and release their references.
+   * A fresh Subject is created so the port can be reconnected later.
    */
   disconnect(): void {
     this._subscription?.unsubscribe();
     this._subscription = undefined;
+    this._subject.complete();
+    this._subject = new Subject<Frame>();
   }
 }
 

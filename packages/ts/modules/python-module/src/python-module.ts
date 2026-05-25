@@ -40,18 +40,33 @@ export class PythonModule extends AsyncModule {
   }
 
   override passthrough(): void {
-    this.pythonProcess?.kill('SIGTERM');
-    this.pythonProcess = undefined;
-    for (const resolve of this.pendingResolvers) resolve([]);
-    this.pendingResolvers = [];
-    this.stdoutBuffer = Buffer.alloc(0);
+    this.terminatePythonProcess();
+    this.drainPendingResolvers();
     super.passthrough();
   }
 
   override stop(): void {
     super.stop();
-    this.pythonProcess?.kill('SIGTERM');
+    this.terminatePythonProcess();
+    this.drainPendingResolvers();
+  }
+
+  /**
+   * Sends SIGTERM to the Python process and escalates to SIGKILL after 2 s
+   * if it has not exited (e.g. while blocked inside a native MediaPipe call).
+   * Clears the reference immediately so no further frames are sent.
+   */
+  private terminatePythonProcess(): void {
+    const proc = this.pythonProcess;
     this.pythonProcess = undefined;
+    if (!proc) return;
+
+    proc.kill('SIGTERM');
+    const forceKill = setTimeout(() => { if (!proc.killed) proc.kill('SIGKILL'); }, 2000);
+    proc.once('exit', () => clearTimeout(forceKill));
+  }
+
+  private drainPendingResolvers(): void {
     for (const resolve of this.pendingResolvers) resolve([]);
     this.pendingResolvers = [];
     this.stdoutBuffer = Buffer.alloc(0);
@@ -86,6 +101,9 @@ export class PythonModule extends AsyncModule {
       if (code !== 0 && code !== null) {
         console.error(`[python-${this.scriptPath}] exited with code ${code}`);
       }
+      // Drain any pending process() calls so they don't hang if the process
+      // died unexpectedly (e.g. OOM, signal from outside) rather than via stop().
+      this.drainPendingResolvers();
     });
   }
 
