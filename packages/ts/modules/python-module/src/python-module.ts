@@ -6,7 +6,7 @@ import { Frame, FrameEvent, createFrame } from '@lights/io';
 import { AvailableModule } from './available-module.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_PACKAGES_PATH = path.resolve(__dirname, '../../../py');
+const DEFAULT_PACKAGES_PATH = path.resolve(__dirname, '../../../../py');
 
 export type PythonModuleOptions = {
   python?: string;

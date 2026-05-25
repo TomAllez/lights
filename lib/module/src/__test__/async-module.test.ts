@@ -35,7 +35,7 @@ describe('AsyncModule', () => {
     module.stop();
   });
 
-  it('drops frames received while process() is running', async () => {
+  it('queues frames received while process() is running', async () => {
     const module = new TestAsyncModule();
     const processed: Frame[] = [];
     let resolveFirst!: (f: Frame) => void;
@@ -58,18 +58,20 @@ describe('AsyncModule', () => {
     const [f1, f2, f3] = [makeFrame(), makeFrame(), makeFrame()];
 
     source.next(f1); // starts process(f1) — held open
-    source.next(f2); // dropped by exhaustMap
-    source.next(f3); // dropped by exhaustMap
+    source.next(f2); // queued by concatMap
+    source.next(f3); // queued by concatMap
 
-    expect(processed).toHaveLength(1); // only f1 entered process()
+    expect(processed).toHaveLength(1); // only f1 entered process() so far
     expect(received).toHaveLength(0);  // nothing emitted yet
 
     resolveFirst(f1);
     await flush();
 
-    expect(received).toHaveLength(1);
+    expect(received).toHaveLength(3);  // all three frames processed in order
     expect(received[0]).toBe(f1);
-    expect(processed).toHaveLength(1); // f2 and f3 were never processed
+    expect(received[1]).toBe(f2);
+    expect(received[2]).toBe(f3);
+    expect(processed).toHaveLength(3);
 
     module.stop();
   });
