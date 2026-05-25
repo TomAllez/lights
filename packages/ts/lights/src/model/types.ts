@@ -49,6 +49,7 @@ export interface Slide {
 }
 
 export interface Project {
+  version: number
   slides: Slide[]
   calibration: Calibration
 }
