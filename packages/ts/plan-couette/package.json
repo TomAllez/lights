@@ -1,0 +1,27 @@
+{
+  "name": "@lights/plan-couette",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "name": "@lights/plan-couette",
+    "targets": {
+      "dev": {
+        "command": "vite",
+        "options": { "cwd": "{projectRoot}" }
+      },
+      "build": {
+        "command": "vite build",
+        "options": { "cwd": "{projectRoot}" }
+      },
+      "preview": {
+        "command": "vite preview",
+        "options": { "cwd": "{projectRoot}" }
+      }
+    }
+  },
+  "dependencies": {
+    "react": "*",
+    "react-dom": "*"
+  }
+}
