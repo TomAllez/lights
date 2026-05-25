@@ -33,7 +33,7 @@ export class InputPort {
    * @param {Observable<Frame>} source - The upstream observable to subscribe to
    */
   connect(source: Observable<Frame>): void {
-    this.disconnect();
+    this._subscription?.unsubscribe();
     this._subscription = source.subscribe(this._subject);
   }
 

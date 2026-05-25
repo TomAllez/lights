@@ -8,13 +8,17 @@ import { FfmpegDriver } from '../driver-ffmpeg.js';
 import { BaseDriver } from '@lights/driver';
 import { Frame } from '@lights/io';
 
-type MockProcess = { stdout: EventEmitter; kill: ReturnType<typeof vi.fn> };
+class MockProcess extends EventEmitter {
+  stdout = new EventEmitter();
+  kill = vi.fn();
+  killed = false;
+}
 
 describe('FfmpegDriver', () => {
   let mockProcess: MockProcess;
 
   beforeEach(() => {
-    mockProcess = { stdout: new EventEmitter(), kill: vi.fn() };
+    mockProcess = new MockProcess();
     vi.mocked(spawn).mockReturnValue(mockProcess as never);
   });
 
