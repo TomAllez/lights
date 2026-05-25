@@ -152,10 +152,10 @@ export class PythonModule extends AsyncModule {
       this.stdoutBuffer = this.stdoutBuffer.subarray(4 + responseLen);
 
       try {
-        const response = JSON.parse(responseJson) as { events: Array<{ type: string; data: number[] }> };
+        const response = JSON.parse(responseJson) as { events: Array<{ type: string; data: string }> };
         const events: FrameEvent[] = (response.events ?? []).map(e => ({
           type: e.type,
-          data: new Uint8Array(e.data),
+          data: Buffer.from(e.data, 'base64'),
         }));
         this.pendingResolvers.shift()?.(events);
       } catch (err) {
