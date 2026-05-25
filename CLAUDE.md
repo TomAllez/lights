@@ -110,13 +110,27 @@ The following are the highest-leverage areas for reducing end-to-end inference l
 - **Base64 events**: Change `encode_face_event` / `encode_hand_event` in Python to emit base64, update `PythonModule.handleStdout` to decode. Cuts stdout payload by ~60%.
 - **Binary stdout framing**: Replace JSON wrapper with a fixed binary header for zero-copy deserialization.
 
+## Project File Versioning
+
+`.lights.json` files carry a top-level `version` integer. On open, `validateProject()` in
+`packages/ts/lights/src/model/schema.ts` migrates old files to `CURRENT_VERSION` before
+they reach the renderer. Files from a newer app version are rejected with a user-facing dialog.
+
+**To add a migration** (e.g. when changing `Slide`, `Surface`, or `Layer` shapes):
+1. Append a function to the `migrations` array in `packages/ts/lights/src/model/migrations.ts`.
+   `CURRENT_VERSION` increments automatically — no manual bookkeeping.
+2. Update the affected types in `types.ts`.
+3. Add a row to the migration history table in `migrations.ts`.
+
+See the JSDoc block at the top of `migrations.ts` for the full how-to.
+
 ## Development Commands
 
 ```bash
 yarn nx test @lights/graph          # run graph unit tests
 yarn nx test @lights/python-module  # run python-module unit tests
 yarn nx run-many -t test            # run all tests
-yarn nx build lights                # typecheck + build Electron app
+yarn nx build @lights/app           # typecheck + build Electron app
 yarn nx lint lights                 # lint
 ```
 
