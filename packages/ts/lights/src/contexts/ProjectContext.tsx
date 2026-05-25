@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react'
 import type { Dispatch, ReactNode } from 'react'
 import type { DetectionCanvasLayer, ImageLayer, Layer, Project, Slide, Surface, TextLayer, Volume, VolumeCamera, VolumeEditMode } from '../model/types'
+import { CURRENT_VERSION } from '../model/schema'
 
 export type EditorMode = 'stage' | 'surface' | 'volume-align' | 'volume-editor'
 
@@ -19,7 +20,7 @@ export interface ProjectState {
 }
 
 const initial: ProjectState = {
-  project: { slides: [], calibration: {} },
+  project: { version: CURRENT_VERSION, slides: [], calibration: {} },
   selectedSlideId: null,
   selectedSurfaceId: null,
   selectedLayerId: null,

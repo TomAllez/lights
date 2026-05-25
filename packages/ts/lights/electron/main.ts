@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { registerGraphHandlers } from './graph'
+import { validateProject } from '../src/model/schema'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -111,16 +112,16 @@ function buildMenu() {
             const filePath = result.filePaths[0]
             try {
               const data = await fs.readFile(filePath, 'utf-8')
-              const project = JSON.parse(data)
+              const project = validateProject(JSON.parse(data))
               currentFilePath = filePath
               isDirty = false
               win?.setTitle(winTitle())
               win?.webContents.send('project:opened', { project, filePath })
-            } catch {
+            } catch (err) {
               await dialog.showMessageBox(win!, {
                 type: 'error',
                 message: 'Could not open project',
-                detail: `Failed to read ${path.basename(filePath)}.`,
+                detail: err instanceof Error ? err.message : `Failed to read ${path.basename(filePath)}.`,
               })
             }
           },
