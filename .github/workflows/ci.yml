@@ -24,6 +24,16 @@ jobs:
           node-version: 20
           cache: 'yarn'
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgles2 libegl1
+          pip install mediapipe numpy
+
       - run: yarn install --frozen-lockfile
 
       - run: yarn nx run-many -t lint test

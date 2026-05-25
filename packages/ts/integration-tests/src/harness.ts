@@ -45,7 +45,7 @@ export class PipelineHarness {
 
       this.graph.addModule(cfg.id, mod);
       this.graph.addRenderer(`renderer-${cfg.id}`, renderer);
-      this.graph.connect('driver:output', `${cfg.id}:input`, { strategy: 'latest' });
+      this.graph.connect('driver:output', `${cfg.id}:input`);
       this.graph.connect(`${cfg.id}:output`, `renderer-${cfg.id}:input`);
 
       this.rendererMap.set(cfg.id, renderer);

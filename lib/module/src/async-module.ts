@@ -1,10 +1,11 @@
-import { Subscription, exhaustMap, from } from 'rxjs';
+import { Subscription, concatMap, from } from 'rxjs';
 import { Frame, InputPort, OutputPort } from '@lights/io';
 
 /**
  * Abstract base class for async frame-processing modules.
  * Subclasses implement {@link process} to transform frames asynchronously.
- * Uses `exhaustMap` so a new frame is ignored while the previous one is still being processed.
+ * Uses `concatMap` so frames are queued and processed in order.
+ * Apply `strategy: 'latest'` on the graph edge to drop frames before they reach the module.
  *
  * @property {InputPort} input - The input port receiving frames
  * @property {OutputPort} output - The output port emitting processed frames
@@ -28,12 +29,12 @@ export abstract class AsyncModule {
   abstract process(frame: Frame): Promise<Frame>;
 
   /**
-   * Starts active processing: frames are passed through {@link process} via exhaustMap.
+   * Starts active processing: frames are passed through {@link process} via concatMap.
    */
   start(): void {
     this.subscription?.unsubscribe();
     this.subscription = this.input.stream$.pipe(
-      exhaustMap(frame => from(this.process(frame))),
+      concatMap(frame => from(this.process(frame))),
     ).subscribe(frame => this.output.emit(frame));
   }
 

@@ -1,5 +1,5 @@
 """
-Handpose estimation module using MediaPipe Hands.
+Handpose estimation module using MediaPipe HandLandmarker (Tasks API).
 
 Reads RGB24 frames from stdin using the lights IPC protocol,
 detects hand landmarks, and writes them back as events.
@@ -16,8 +16,22 @@ import struct
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import urllib.request
 import mediapipe as mp
+from mediapipe.tasks import python as mp_python
+from mediapipe.tasks.python import vision
 from lights_core import cli, frame, ipc
+
+_MODEL_PATH = os.path.join(os.path.dirname(__file__), 'hand_landmarker.task')
+_MODEL_URL = (
+    'https://storage.googleapis.com/mediapipe-models/'
+    'hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+)
+
+
+def _ensure_model() -> None:
+    if not os.path.exists(_MODEL_PATH):
+        urllib.request.urlretrieve(_MODEL_URL, _MODEL_PATH)
 
 
 def encode_hand_event(handedness_label: str, landmarks) -> dict:
@@ -34,12 +48,17 @@ def main():
     parser.add_argument('--max-hands', type=int, default=2)
     args = parser.parse_args()
 
-    hands = mp.solutions.hands.Hands(
-        static_image_mode=False,
-        max_num_hands=args.max_hands,
-        min_detection_confidence=args.min_detection_confidence,
+    _ensure_model()
+    options = vision.HandLandmarkerOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=_MODEL_PATH),
+        running_mode=vision.RunningMode.IMAGE,
+        num_hands=args.max_hands,
+        min_hand_detection_confidence=args.min_detection_confidence,
+        min_hand_presence_confidence=args.min_tracking_confidence,
         min_tracking_confidence=args.min_tracking_confidence,
     )
+
+    hand_landmarker = vision.HandLandmarker.create_from_options(options)
 
     while True:
         msg = ipc.read_message(sys.stdin)
@@ -51,18 +70,15 @@ def main():
         events = []
 
         if video is not None:
-            detection = hands.process(video)
-            if detection.multi_hand_landmarks and detection.multi_handedness:
-                for lm_set, handedness in zip(
-                    detection.multi_hand_landmarks,
-                    detection.multi_handedness,
-                ):
-                    label = handedness.classification[0].label
-                    events.append(encode_hand_event(label, lm_set.landmark))
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=video)
+            result = hand_landmarker.detect(mp_image)
+            for landmarks, handedness_list in zip(result.hand_landmarks, result.handedness):
+                label = handedness_list[0].category_name
+                events.append(encode_hand_event(label, landmarks))
 
         ipc.write_response(sys.stdout, events)
 
-    hands.close()
+    hand_landmarker.close()
 
 
 if __name__ == '__main__':
