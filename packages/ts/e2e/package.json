@@ -1,0 +1,23 @@
+{
+  "name": "@lights/e2e",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "name": "@lights/e2e",
+    "tags": ["scope:e2e"],
+    "targets": {
+      "e2e": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "npx playwright test",
+          "cwd": "{projectRoot}"
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "playwright": "^1.49.0"
+  }
+}
