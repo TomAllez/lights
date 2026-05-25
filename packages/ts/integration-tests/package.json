@@ -1,0 +1,17 @@
+{
+  "name": "@lights/integration-tests",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "nx": {
+    "name": "@lights/integration-tests",
+    "tags": ["scope:integration"]
+  },
+  "dependencies": {
+    "@lights/driver-synthetic": "*",
+    "@lights/graph": "*",
+    "@lights/io": "*",
+    "@lights/python-module": "*",
+    "@lights/renderer": "*"
+  }
+}
