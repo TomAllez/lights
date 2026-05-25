@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MAIN_JS = path.resolve(__dirname, '../../lights/dist/main.js');
+const MAIN_JS = path.resolve(__dirname, '../../lights/dist-electron/main.js');
 
 test.describe('Lights app — project and slide UI', () => {
   test('app renders the project view on launch', async () => {

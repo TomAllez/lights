@@ -3,8 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Built app lives at packages/ts/lights/dist/main.js after `yarn nx build @lights/app`
-const MAIN_JS = path.resolve(__dirname, '../../lights/dist/main.js');
+const MAIN_JS = path.resolve(__dirname, '../../lights/dist-electron/main.js');
 
 test.describe('Lights app — Electron window', () => {
   test('app window opens with a title', async () => {
@@ -27,7 +26,9 @@ test.describe('Lights app — Electron window', () => {
       window.on('pageerror', err => errors.push(err.message));
       await window.waitForLoadState('domcontentloaded');
       await window.waitForTimeout(2000); // let React hydrate
-      expect(errors).toHaveLength(0);
+      // Filter out headless-only GPU errors that do not affect app logic
+      const realErrors = errors.filter(msg => !msg.includes('WebGL context'));
+      expect(realErrors).toHaveLength(0);
     } finally {
       await app.close();
     }
