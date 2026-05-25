@@ -1,6 +1,22 @@
 import './LayerList.css'
 import { useState } from 'react'
+import { LayoutTemplate, Trash2, Eye, EyeOff } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { ImageLayer, Layer, SolidLayer, TextLayer, DetectionCanvasLayer } from '../../model/types'
+
+function EmptyState({ icon: Icon, message, action }: {
+  icon: LucideIcon
+  message: string
+  action?: { label: string; onClick: () => void }
+}) {
+  return (
+    <div className="empty-state">
+      <Icon size={20} className="empty-state-icon" />
+      <span className="empty-state-msg">{message}</span>
+      {action && <button className="empty-state-btn" onClick={action.onClick}>{action.label}</button>}
+    </div>
+  )
+}
 
 interface LayerListProps {
   surface: { layers: Layer[] }
@@ -50,7 +66,7 @@ export default function LayerList({
   return (
     <div className="layer-panel">
       {surface.layers.length === 0 ? (
-        <p className="panel-empty">No layers</p>
+        <EmptyState icon={LayoutTemplate} message="No layers" />
       ) : (
         <div className="layer-list">
           {surface.layers.map((layer, idx) => (
@@ -75,7 +91,7 @@ export default function LayerList({
                 title={layer.visible ? 'Hide' : 'Show'}
                 onClick={e => { e.stopPropagation(); onToggleVisibility(layer.id) }}
               >
-                {layer.visible ? '●' : '○'}
+                {layer.visible ? <Eye size={12} /> : <EyeOff size={12} />}
               </button>
               <span className="layer-name">{layer.name}</span>
               {layer.type === 'solid' && (
@@ -100,7 +116,7 @@ export default function LayerList({
                 title="Remove layer"
                 onClick={e => { e.stopPropagation(); onRemove(layer.id) }}
               >
-                ×
+                <Trash2 size={12} />
               </button>
             </div>
           ))}

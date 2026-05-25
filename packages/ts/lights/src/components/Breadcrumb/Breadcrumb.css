@@ -1,0 +1,14 @@
+.breadcrumb {
+  height: 28px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-shrink: 0;
+}
+.breadcrumb-sep { font-size: var(--text-sm); color: var(--text-muted); }
+.breadcrumb-item { font-size: var(--text-sm); color: var(--text-secondary); }
+.breadcrumb-item--link { color: var(--accent); cursor: pointer; }
+.breadcrumb-item--link:hover { color: var(--accent-hover); }

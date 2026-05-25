@@ -1,5 +1,6 @@
 import './SurfacePanel.css'
 import { useState } from 'react'
+import { Trash2, Pencil, Crosshair, Plus } from 'lucide-react'
 import { useProject } from '../../contexts'
 import type { DetectionCanvasLayer, SolidLayer, TextLayer, VolumeShapeType } from '../../model/types'
 import { getRendererIds } from '../../detectionCanvas'
@@ -189,7 +190,7 @@ export default function SurfacePanel() {
                     dispatch({ type: 'volume:shapeRemove', slideId: selectedSlideId, shapeId: sh.id })
                   }}
                 >
-                  ×
+                  <Trash2 size={12} />
                 </button>
               </div>
             ))
@@ -284,7 +285,7 @@ export default function SurfacePanel() {
             title="Add surface"
             onClick={() => dispatch({ type: 'surface:add', slideId: selectedSlideId })}
           >
-            +
+            <Plus size={12} />
           </button>
         )}
       </div>
@@ -335,7 +336,7 @@ export default function SurfacePanel() {
                   dispatch({ type: 'surface:remove', slideId: selectedSlideId!, surfaceId: s.id })
                 }}
               >
-                ×
+                <Trash2 size={12} />
               </button>
             </div>
           ))}
@@ -350,7 +351,7 @@ export default function SurfacePanel() {
             title="Add volume"
             onClick={() => dispatch({ type: 'volume:add', slideId: selectedSlideId })}
           >
-            +
+            <Plus size={12} />
           </button>
         )}
       </div>
@@ -364,14 +365,14 @@ export default function SurfacePanel() {
               title="Edit volume"
               onClick={() => dispatch({ type: 'volume:editorEnter' })}
             >
-              ✎
+              <Pencil size={12} />
             </button>
             <button
               className="icon-btn"
               title="Align camera"
               onClick={() => dispatch({ type: 'volume:alignStart' })}
             >
-              ⊹
+              <Crosshair size={12} />
             </button>
             <button
               className="icon-btn surface-remove"
@@ -381,7 +382,7 @@ export default function SurfacePanel() {
                 dispatch({ type: 'volume:remove', slideId: selectedSlideId })
               }}
             >
-              ×
+              <Trash2 size={12} />
             </button>
           </div>
         </div>

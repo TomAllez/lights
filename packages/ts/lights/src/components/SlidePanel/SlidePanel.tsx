@@ -1,6 +1,22 @@
 import './SlidePanel.css'
 import { useState } from 'react'
+import { Copy, Layers, Trash2 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useProject } from '../../contexts'
+
+function EmptyState({ icon: Icon, message, action }: {
+  icon: LucideIcon
+  message: string
+  action?: { label: string; onClick: () => void }
+}) {
+  return (
+    <div className="empty-state">
+      <Icon size={20} className="empty-state-icon" />
+      <span className="empty-state-msg">{message}</span>
+      {action && <button className="empty-state-btn" onClick={action.onClick}>{action.label}</button>}
+    </div>
+  )
+}
 
 export default function SlidePanel() {
   const { state, dispatch } = useProject()
@@ -8,51 +24,77 @@ export default function SlidePanel() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
 
-  function startEdit(slideId: string, name: string, e: React.MouseEvent) {
+  function startRename(slideId: string, currentName: string, e: React.MouseEvent) {
     e.stopPropagation()
     setEditingId(slideId)
-    setEditValue(name)
+    setEditValue(currentName)
   }
 
-  function commit(slideId: string) {
-    const trimmed = editValue.trim()
-    if (trimmed) dispatch({ type: 'slide:rename', slideId, name: trimmed })
+  function commitRename(slideId: string) {
+    const trimmedName = editValue.trim()
+    if (trimmedName) dispatch({ type: 'slide:rename', slideId, name: trimmedName })
     setEditingId(null)
   }
 
   return (
     <aside className="slide-panel">
       <div className="slide-panel-header">
-        <span>Slides</span>
-        <button
-          className="icon-btn"
-          title="Add slide"
-          onClick={() => dispatch({ type: 'slide:add' })}
-        >
-          +
-        </button>
+        <span>SLIDES</span>
       </div>
 
-      {project.slides.length === 0 ? (
-        <p className="panel-empty">No slides</p>
-      ) : (
-        <div className="slide-list">
-          {project.slides.map(slide => (
+      <div className="slide-list">
+        {project.slides.length === 0 && (
+          <EmptyState
+            icon={Layers}
+            message="No slides yet"
+            action={{ label: '+ New Slide', onClick: () => dispatch({ type: 'slide:add' }) }}
+          />
+        )}
+        {project.slides.map(slide => {
+          const isSelected = slide.id === selectedSlideId
+          const isEditing = editingId === slide.id
+
+          return (
             <div
               key={slide.id}
-              className={`slide-item${slide.id === selectedSlideId ? ' selected' : ''}`}
+              className={`slide-card${isSelected ? ' selected' : ''}`}
               onClick={() => {
-                if (editingId !== slide.id) dispatch({ type: 'slide:select', slideId: slide.id })
+                if (!isEditing) dispatch({ type: 'slide:select', slideId: slide.id })
               }}
             >
-              {editingId === slide.id ? (
+              <div className="slide-thumb">
+                <div className="slide-card-actions">
+                  <button
+                    className="icon-btn"
+                    title="Duplicate slide"
+                    onClick={e => {
+                      e.stopPropagation()
+                      dispatch({ type: 'slide:duplicate', slideId: slide.id })
+                    }}
+                  >
+                    <Copy size={12} />
+                  </button>
+                  <button
+                    className="icon-btn slide-remove"
+                    title="Remove slide"
+                    onClick={e => {
+                      e.stopPropagation()
+                      dispatch({ type: 'slide:remove', slideId: slide.id })
+                    }}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {isEditing ? (
                 <input
                   autoFocus
                   className="rename-input"
                   value={editValue}
                   onFocus={e => e.target.select()}
                   onChange={e => setEditValue(e.target.value)}
-                  onBlur={() => commit(slide.id)}
+                  onBlur={() => commitRename(slide.id)}
                   onKeyDown={e => {
                     if (e.key === 'Enter') e.currentTarget.blur()
                     if (e.key === 'Escape') setEditingId(null)
@@ -61,38 +103,23 @@ export default function SlidePanel() {
                 />
               ) : (
                 <span
-                  className="slide-name"
-                  onClick={e => {
-                    if (slide.id === selectedSlideId) startEdit(slide.id, slide.name, e)
-                  }}
+                  className="slide-card-name"
+                  onDoubleClick={e => startRename(slide.id, slide.name, e)}
                 >
                   {slide.name}
                 </span>
               )}
-              <button
-                className="icon-btn slide-action"
-                title="Duplicate slide"
-                onClick={e => {
-                  e.stopPropagation()
-                  dispatch({ type: 'slide:duplicate', slideId: slide.id })
-                }}
-              >
-                ⎘
-              </button>
-              <button
-                className="icon-btn slide-action slide-remove"
-                title="Remove slide"
-                onClick={e => {
-                  e.stopPropagation()
-                  dispatch({ type: 'slide:remove', slideId: slide.id })
-                }}
-              >
-                ×
-              </button>
             </div>
-          ))}
-        </div>
-      )}
+          )
+        })}
+      </div>
+
+      <button
+        className="slide-add-btn"
+        onClick={() => dispatch({ type: 'slide:add' })}
+      >
+        + New Slide
+      </button>
     </aside>
   )
 }
